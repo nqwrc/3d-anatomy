@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>GLB Load Test</title>
+</head>
+<body>
+  <h1>GLB Loader Test</h1>
+  <button id="loadBtn">Load muscular.glb</button>
+  <button id="loadSkeletalBtn">Load skeletal.glb</button>
+  <pre id="output"></pre>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "/node_modules/three/build/three.module.js",
+      "three/addons/": "/node_modules/three/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    const output = document.getElementById('output');
+    const loader = new GLTFLoader();
+
+    function log(msg) {
+      output.textContent += msg + '\n';
+    }
+
+    async function loadAndReport(name) {
+      try {
+        log(`Loading /models/${name}.glb ...`);
+        const gltf = await new Promise((resolve, reject) => {
+          loader.load(`/models/${name}.glb`, resolve, undefined, reject);
+        });
+
+        const names = [];
+        gltf.scene.traverse(child => {
+          if (child.isMesh) names.push(child.name || '(no name)');
+        });
+
+        log(`OK ${name}: meshes=${names.length}`);
+        log(`Names: ${JSON.stringify(names)}`);
+      } catch (e) {
+        log(`ERROR ${name}: ${e.message}`);
+      }
+    }
+
+    document.getElementById('loadBtn').addEventListener('click', async () => {
+      output.textContent = '';
+      await loadAndReport('muscular');
+    });
+
+    document.getElementById('loadSkeletalBtn').addEventListener('click', async () => {
+      output.textContent = '';
+      await loadAndReport('skeletal');
+    });
+  </script>
+</body>
+</html>

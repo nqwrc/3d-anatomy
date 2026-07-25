@@ -1,0 +1,43 @@
+{
+  "muscular": [
+    "biceps_brachii",
+    "triceps_brachii",
+    "deltoid",
+    "pectoralis_major",
+    "latissimus_dorsi",
+    "trapezius",
+    "rectus_abdominis",
+    "external_oblique"
+  ],
+  "skeletal": [
+    "femur",
+    "tibia",
+    "humerus",
+    "radius",
+    "ulna",
+    "scapula",
+    "clavicle",
+    "skull",
+    "vertebral_column",
+    "rib_cage"
+  ],
+  "cardiovascular": [
+    "heart"
+  ],
+  "respiratory": [
+    "lung_right",
+    "lung_left"
+  ],
+  "digestive": [
+    "liver",
+    "stomach"
+  ],
+  "urinary": [
+    "kidney_right"
+  ],
+  "nervous": [
+    "brain",
+    "spinal_cord",
+    "sciatic_nerve"
+  ]
+}

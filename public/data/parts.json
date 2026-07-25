@@ -1,0 +1,602 @@
+{
+  "biceps_brachii": {
+    "id": "biceps_brachii",
+    "meshName": "Biceps_brachii",
+    "name": {
+      "it": "Bicipite brachiale",
+      "en": "Biceps brachii"
+    },
+    "latinName": "Musculus biceps brachii",
+    "system": "muscular",
+    "region": "upper_limb",
+    "description": {
+      "it": "Muscolo della regione anteriore del braccio, a due capi.",
+      "en": "Two-headed muscle of the anterior arm."
+    },
+    "functions": [
+      "Flessione del gomito",
+      "Supinazione dell'avambraccio"
+    ],
+    "origin": "Processo coracoideo (capo breve) e tubercolo sovraglenoideo (capo lungo)",
+    "insertion": "Tuberosità del radio e aponeurosi bicipitale",
+    "innervation": "Nervo muscolocutaneo (C5-C6)",
+    "vascularization": "Arteria brachiale",
+    "clinicalNotes": "Rottura del capo lungo frequente negli sportivi"
+  },
+  "triceps_brachii": {
+    "id": "triceps_brachii",
+    "meshName": "Triceps_brachii",
+    "name": {
+      "it": "Tricipite brachiale",
+      "en": "Triceps brachii"
+    },
+    "latinName": "Musculus triceps brachii",
+    "system": "muscular",
+    "region": "upper_limb",
+    "description": {
+      "it": "Muscolo della regione posteriore del braccio, a tre capi, principale estensore del gomito.",
+      "en": "Three-headed muscle of the posterior arm, main elbow extensor."
+    },
+    "functions": [
+      "Estensione del gomito",
+      "Estensione e adduzione della spalla (capo lungo)"
+    ],
+    "origin": "Capo lungo: tubercolo infraglenoideo; Capi laterale e mediale: omero posteriore",
+    "insertion": "Processo olecranico dell'ulna",
+    "innervation": "Nervo radiale (C6-C8)",
+    "vascularization": "Arteria brachiale profonda",
+    "clinicalNotes": "Test del riflesso tricipitale (C7)"
+  },
+  "deltoid": {
+    "id": "deltoid",
+    "meshName": "Deltoid",
+    "name": {
+      "it": "Deltoide",
+      "en": "Deltoid"
+    },
+    "latinName": "Musculus deltoideus",
+    "system": "muscular",
+    "region": "upper_limb",
+    "description": {
+      "it": "Muscolo spesso e triangolare che ricopre l'articolazione della spalla.",
+      "en": "Thick triangular muscle covering the shoulder joint."
+    },
+    "functions": [
+      "Abduzione del braccio (fibre medie)",
+      "Flessione e rotazione interna (fibre anteriori)",
+      "Estensione e rotazione esterna (fibre posteriori)"
+    ],
+    "origin": "Terzo laterale della clavicola, acromine, spina della scapola",
+    "insertion": "Tuberosità deltoidea dell'omero",
+    "innervation": "Nervo ascellare (C5-C6)",
+    "vascularization": "Arteria circonflessa omerale posteriore",
+    "clinicalNotes": "Lesione del nervo ascellare causa perdita abduzione"
+  },
+  "pectoralis_major": {
+    "id": "pectoralis_major",
+    "meshName": "Pectoralis_major",
+    "name": {
+      "it": "Grande pettorale",
+      "en": "Pectoralis major"
+    },
+    "latinName": "Musculus pectoralis major",
+    "system": "muscular",
+    "region": "thorax",
+    "description": {
+      "it": "Muscolo grande e ventaglio-forme della parete toracica anteriore.",
+      "en": "Large fan-shaped muscle of the anterior thoracic wall."
+    },
+    "functions": [
+      "Adduzione del braccio",
+      "Flessione e rotazione interna del braccio"
+    ],
+    "origin": "Clavicola (capo clavicolare), sterno e coste 1-6 (capo sterno-costale)",
+    "insertion": "Cresta del tubero maggiore dell'omero",
+    "innervation": "Nervi pettorali mediale e laterale (C5-T1)",
+    "vascularization": "Arteria toracica interna, arteria toraco-acromiale",
+    "clinicalNotes": "Test di adduzione contro resistenza"
+  },
+  "latissimus_dorsi": {
+    "id": "latissimus_dorsi",
+    "meshName": "Latissimus_dorsi",
+    "name": {
+      "it": "Gran dorsale",
+      "en": "Latissimus dorsi"
+    },
+    "latinName": "Musculus latissimus dorsi",
+    "system": "muscular",
+    "region": "thorax",
+    "description": {
+      "it": "Muscolo ampio e piatto della regione lombare e toracica posteriore.",
+      "en": "Broad flat muscle of the lower posterior thorax."
+    },
+    "functions": [
+      "Estensione del braccio",
+      "Adduzione del braccio",
+      "Rotazione interna del braccio"
+    ],
+    "origin": "Processi spinosi T7-L5, cresta iliaca, coste 9-12, angolo inferiore scapola",
+    "insertion": "Solco intertubercolare dell'omero",
+    "innervation": "Nervo toracodorsale (C6-C8)",
+    "vascularization": "Arteria dorsale della scapola",
+    "clinicalNotes": "Muscolo usato per innesti miocutanei"
+  },
+  "trapezius": {
+    "id": "trapezius",
+    "meshName": "Trapezius",
+    "name": {
+      "it": "Trapezio",
+      "en": "Trapezius"
+    },
+    "latinName": "Musculus trapezius",
+    "system": "muscular",
+    "region": "thorax",
+    "description": {
+      "it": "Muscolo grande, triangolare, della regione posteriore del collo e del torace.",
+      "en": "Large triangular muscle of the posterior neck and thorax."
+    },
+    "functions": [
+      "Elevazione della scapola (fibre superiori)",
+      "Retrazione della scapola (fibre medie)",
+      "Depressione della scapola (fibre inferiori)",
+      "Rotazione superiore della scapola"
+    ],
+    "origin": "Osso occipitale, legamento nucale, processi spinosi C7-T12",
+    "insertion": "Terzo laterale clavicola, acromine, spina scapola",
+    "innervation": "Nervo accessorio (XI), rami cervicali C3-C4",
+    "vascularization": "Arteria trasversa del collo",
+    "clinicalNotes": "Lesione nervo accessorio: spalla cadente"
+  },
+  "rectus_abdominis": {
+    "id": "rectus_abdominis",
+    "meshName": "Rectus_abdominis",
+    "name": {
+      "it": "Retto dell'addome",
+      "en": "Rectus abdominis"
+    },
+    "latinName": "Musculus rectus abdominis",
+    "system": "muscular",
+    "region": "abdomen",
+    "description": {
+      "it": "Muscolo lungo e piatto della parete addominale anteriore.",
+      "en": "Long flat muscle of the anterior abdominal wall."
+    },
+    "functions": [
+      "Flessione del tronco",
+      "Compressione delle viscere addominali"
+    ],
+    "origin": "Sinfisi pubica, cresta pubica",
+    "insertion": "Processo xifoideo, coste 5-7",
+    "innervation": "Nervi intercostali T7-T11, nervo sottocostale T12",
+    "vascularization": "Arteria epigastrica superiore e inferiore",
+    "clinicalNotes": "Diastasi dei retti in gravidanza"
+  },
+  "external_oblique": {
+    "id": "external_oblique",
+    "meshName": "External_oblique",
+    "name": {
+      "it": "Obliquo esterno",
+      "en": "External oblique"
+    },
+    "latinName": "Musculus obliquus externus abdominis",
+    "system": "muscular",
+    "region": "abdomen",
+    "description": {
+      "it": "Muscolo ampio e sottile della parete addominale laterale.",
+      "en": "Broad thin muscle of the lateral abdominal wall."
+    },
+    "functions": [
+      "Flessione del tronco",
+      "Rotazione controlaterale del tronco",
+      "Flessione laterale del tronco"
+    ],
+    "origin": "Superfici esterne coste 5-12",
+    "insertion": "Linea alba, cresta iliaca, legamento inguinale",
+    "innervation": "Nervi intercostali T7-T11, nervo sottocostale T12, nervo ileoipogastrico L1",
+    "vascularization": "Arterie intercostali posteriori, arteria epigastrica inferiore",
+    "clinicalNotes": "Forma il canale inguinale"
+  },
+  "femur": {
+    "id": "femur",
+    "meshName": "Femur",
+    "name": {
+      "it": "Femore",
+      "en": "Femur"
+    },
+    "latinName": "Femur",
+    "system": "skeletal",
+    "region": "lower_limb",
+    "description": {
+      "it": "Osso più lungo e forte dello scheletro umano, osso della coscia.",
+      "en": "Longest and strongest bone in the human body, thigh bone."
+    },
+    "functions": [
+      "Supporto del peso corporeo",
+      "Leva per i muscoli della coscia",
+      "Articolazione coxo-femorale e ginocchio"
+    ],
+    "parts": ["Testa", "Collo", "Trocantere maggiore", "Trocantere minore", "Corpo", "Condili mediale e laterale"],
+    "clinicalNotes": "Frattura del collo del femore frequente negli anziani"
+  },
+  "tibia": {
+    "id": "tibia",
+    "meshName": "Tibia",
+    "name": {
+      "it": "Tibia",
+      "en": "Tibia"
+    },
+    "latinName": "Tibia",
+    "system": "skeletal",
+    "region": "lower_limb",
+    "description": {
+      "it": "Osso mediale e più grande della gamba, sostiene il peso corporeo.",
+      "en": "Medial larger bone of the leg, weight-bearing."
+    },
+    "functions": [
+      "Supporto peso corporeo",
+      "Articolazione ginocchio e caviglia"
+    ],
+    "parts": ["Condili mediale e laterale", "Tuberosità tibiale", "Corpo", "Malletto mediale"],
+    "clinicalNotes": "Frattura di pilone tibiale, sindrome compartimentale"
+  },
+  "humerus": {
+    "id": "humerus",
+    "meshName": "Humerus",
+    "name": {
+      "it": "Omero",
+      "en": "Humerus"
+    },
+    "latinName": "Humerus",
+    "system": "skeletal",
+    "region": "upper_limb",
+    "description": {
+      "it": "Osso lungo del braccio, si articola con scapola e radio/ulna.",
+      "en": "Long bone of the arm, articulates with scapula and radius/ulna."
+    },
+    "functions": [
+      "Supporto braccio",
+      "Leva per muscoli spalla e gomito"
+    ],
+    "parts": ["Testa", "Collo anatomico/chirurgico", "Tuberosità maggiore/minore", "Corpo", "Epicondili", "Troclea", "Capitello"],
+    "clinicalNotes": "Frattura collo chirurgico, lesione nervo ascellare"
+  },
+  "radius": {
+    "id": "radius",
+    "meshName": "Radius",
+    "name": {
+      "it": "Radio",
+      "en": "Radius"
+    },
+    "latinName": "Radius",
+    "system": "skeletal",
+    "region": "upper_limb",
+    "description": {
+      "it": "Osso laterale dell'avambraccio, si articola con omero e ulna.",
+      "en": "Lateral forearm bone, articulates with humerus and ulna."
+    },
+    "functions": [
+      "Rotazione avambraccio (pronazione/supinazione)",
+      "Articolazione polso"
+    ],
+    "parts": ["Testa", "Collo", "Tuberosità bicipitale", "Corpo", "Estremo distale"],
+    "clinicalNotes": "Frattura di Colles, frattura di Smith"
+  },
+  "ulna": {
+    "id": "ulna",
+    "meshName": "Ulna",
+    "name": {
+      "it": "Ulna",
+      "en": "Ulna"
+    },
+    "latinName": "Ulna",
+    "system": "skeletal",
+    "region": "upper_limb",
+    "description": {
+      "it": "Osso mediale dell'avambraccio, forma l'articolazione del gomito con l'omero.",
+      "en": "Medial forearm bone, forms elbow joint with humerus."
+    },
+    "functions": [
+      "Stabilità gomito",
+      "Articolazione radio-ulnare"
+    ],
+    "parts": ["Olecrano", "Incisura trocleare", "Processo coronoideo", "Corpo", "Testa", "Apice stiloideo"],
+    "clinicalNotes": "Frattura dell'olecrano, sindrome del tunnel cubitale"
+  },
+  "scapula": {
+    "id": "scapula",
+    "meshName": "Scapula",
+    "name": {
+      "it": "Scapola",
+      "en": "Scapula"
+    },
+    "latinName": "Scapula",
+    "system": "skeletal",
+    "region": "upper_limb",
+    "description": {
+      "it": "Osso piatto triangolare della cingola scapolare posteriore.",
+      "en": "Flat triangular bone of the posterior pectoral girdle."
+    },
+    "functions": [
+      "Inserzione muscoli spalla",
+      "Articolazione gleno-omerale"
+    ],
+    "parts": ["Corpo", "Spina", "Acromine", "Processo coracoideo", "Cavità glenoidea", "Angoli"],
+    "clinicalNotes": "Frattura scapola, spalla di Sprengel"
+  },
+  "clavicle": {
+    "id": "clavicle",
+    "meshName": "Clavicle",
+    "name": {
+      "it": "Clavicola",
+      "en": "Clavicle"
+    },
+    "latinName": "Clavicula",
+    "system": "skeletal",
+    "region": "upper_limb",
+    "description": {
+      "it": "Osso lungo a S che collega lo sterno alla scapola.",
+      "en": "S-shaped long bone connecting sternum to scapula."
+    },
+    "functions": [
+      "Strut per cingola scapolare",
+      "Protezione vasi/tronchi sottostanti"
+    ],
+    "parts": ["Estremo sternale", "Estremo acromiale", "Corpo"],
+    "clinicalNotes": "Frattura clavicola comune in cadute su spalla"
+  },
+  "skull": {
+    "id": "skull",
+    "meshName": "Skull",
+    "name": {
+      "it": "Cranio",
+      "en": "Skull"
+    },
+    "latinName": "Cranium",
+    "system": "skeletal",
+    "region": "head",
+    "description": {
+      "it": "Complesso osseo che protegge l'encefalo e forma il viso.",
+      "en": "Bony complex protecting the brain and forming the face."
+    },
+    "parts": ["Volta cranica", "Base cranica", "Scheletro facciale", "Seni paranasali"],
+    "clinicalNotes": "Fontanelle nei neonati, suture craniche"
+  },
+  "vertebral_column": {
+    "id": "vertebral_column",
+    "meshName": "Vertebral_column",
+    "name": {
+      "it": "Colonna vertebrale",
+      "en": "Vertebral column"
+    },
+    "latinName": "Columna vertebralis",
+    "system": "skeletal",
+    "region": "thorax",
+    "description": {
+      "it": "Serie di vertebre che forma l'asse centrale del corpo.",
+      "en": "Series of vertebrae forming the central body axis."
+    },
+    "parts": ["Cervicali (7)", "Toraciche (12)", "Lombari (5)", "Sacro (5 fuse)", "Coccige (4 fuse)"],
+    "clinicalNotes": "Scoliosi, lordosi, cifosi, ernia discale"
+  },
+  "rib_cage": {
+    "id": "rib_cage",
+    "meshName": "Rib_cage",
+    "name": {
+      "it": "Gabbia toracica",
+      "en": "Rib cage"
+    },
+    "latinName": "Cavea thoracis",
+    "system": "skeletal",
+    "region": "thorax",
+    "description": {
+      "it": "Struttura ossea formata da coste, sterno e vertebre toraciche.",
+      "en": "Bony structure formed by ribs, sternum, thoracic vertebrae."
+    },
+    "parts": ["Coste 1-12 (vere, false, fluttuanti)", "Sterno (manubrio, corpo, processo xifoideo)", "Vertebre toraciche"],
+    "clinicalNotes": "Fratture costali, torace instabile"
+  },
+  "heart": {
+    "id": "heart",
+    "meshName": "Heart",
+    "name": {
+      "it": "Cuore",
+      "en": "Heart"
+    },
+    "latinName": "Cor",
+    "system": "cardiovascular",
+    "region": "thorax",
+    "description": {
+      "it": "Organo muscolare cavo che pompa il sangue nel sistema circolatorio.",
+      "en": "Hollow muscular organ pumping blood through circulatory system."
+    },
+    "functions": [
+      "Pompa sangue polmonare e sistemico",
+      "Genera pressione arteriosa"
+    ],
+    "parts": ["Atrio destro/sinistro", "Ventricolo destro/sinistro", "Valvole", "Sistema di conduzione"],
+    "innervation": "Plesso cardiaco (simpatico/parasimpatico)",
+    "vascularization": "Arterie coronarie destra e sinistra",
+    "clinicalNotes": "Infarto miocardico, aritmie, insufficienza cardiaca"
+  },
+  "lung_right": {
+    "id": "lung_right",
+    "meshName": "Lung_Right",
+    "name": {
+      "it": "Polmone destro",
+      "en": "Right lung"
+    },
+    "latinName": "Pulmo dexter",
+    "system": "respiratory",
+    "region": "thorax",
+    "description": {
+      "it": "Polmone a tre lobi (superiore, medio, inferiore), più grande del sinistro.",
+      "en": "Three-lobed lung (upper, middle, lower), larger than left."
+    },
+    "functions": [
+      "Scambi gassosi",
+      "Ossigenazione sangue"
+    ],
+    "parts": ["Lobo superiore", "Lobo medio", "Lobo inferiore", "Ilo polmonare"],
+    "vascularization": "Arteria polmonare destra, vene polmonari",
+    "clinicalNotes": "Polmonite, tumore polmonare, versamento pleurico"
+  },
+  "lung_left": {
+    "id": "lung_left",
+    "meshName": "Lung_Left",
+    "name": {
+      "it": "Polmone sinistro",
+      "en": "Left lung"
+    },
+    "latinName": "Pulmo sinister",
+    "system": "respiratory",
+    "region": "thorax",
+    "description": {
+      "it": "Polmone a due lobi (superiore, inferiore) con incisura cardiaca.",
+      "en": "Two-lobed lung (upper, lower) with cardiac notch."
+    },
+    "functions": [
+      "Scambi gassosi",
+      "Ossigenazione sangue"
+    ],
+    "parts": ["Lobo superiore", "Lobo inferiore", "Lingula", "Ilo polmonare"],
+    "vascularization": "Arteria polmonare sinistra, vene polmonari",
+    "clinicalNotes": "Incisura cardiaca per cuore"
+  },
+  "liver": {
+    "id": "liver",
+    "meshName": "Liver",
+    "name": {
+      "it": "Fegato",
+      "en": "Liver"
+    },
+    "latinName": "Hepar",
+    "system": "digestive",
+    "region": "abdomen",
+    "description": {
+      "it": "Ghiandola più grande del corpo, sede di funzioni metaboliche vitali.",
+      "en": "Largest gland in body, site of vital metabolic functions."
+    },
+    "functions": [
+      "Metabolismo glucidi, lipidi, proteine",
+      "Detossificazione",
+      "Produzione bile",
+      "Sintesi fattori coagulazione"
+    ],
+    "parts": ["Lobo destro", "Lobo sinistro", "Lobo quadrato", "Lobo caudato", "Colecisti"],
+    "vascularization": "Arteria epatica propria, vena porta",
+    "clinicalNotes": "Epatite, cirrosi, tumore epatico, steatosi"
+  },
+  "stomach": {
+    "id": "stomach",
+    "meshName": "Stomach",
+    "name": {
+      "it": "Stomaco",
+      "en": "Stomach"
+    },
+    "latinName": "Ventriculus",
+    "system": "digestive",
+    "region": "abdomen",
+    "description": {
+      "it": "Organo cavo muscolare per digestione chimica e meccanica del cibo.",
+      "en": "Hollow muscular organ for chemical and mechanical food digestion."
+    },
+    "functions": [
+      "Deposito cibo",
+      "Secrezione acido cloridrico e pepsina",
+      "Miscelazione chimo"
+    ],
+    "parts": ["Cardias", "Fondo", "Corpo", "Antro", "Piloro", "Curvatura maggiore/minore"],
+    "vascularization": "Arterie gastriche (sinistra, destra, gastroepiploiche)",
+    "clinicalNotes": "Gastrite, ulcera peptica, cancro gastrico"
+  },
+  "kidney_right": {
+    "id": "kidney_right",
+    "meshName": "Kidney_Right",
+    "name": {
+      "it": "Rene destro",
+      "en": "Right kidney"
+    },
+    "latinName": "Ren dexter",
+    "system": "urinary",
+    "region": "abdomen",
+    "description": {
+      "it": "Organo retroperitoneale per filtrazione sangue e produzione urina.",
+      "en": "Retroperitoneal organ for blood filtration and urine production."
+    },
+    "functions": [
+      "Filtrazione sangue",
+      "Regolazione elettroliti",
+      "Produzione urina",
+      "Produzione eritropoietina, renina"
+    ],
+    "parts": ["Corteccia", "Midollo", "Piramidi", "Pelvi renale", "Calici"],
+    "vascularization": "Arteria renale, vena renale",
+    "clinicalNotes": "Calcolosi renale, insufficienza renale, tumore"
+  },
+  "brain": {
+    "id": "brain",
+    "meshName": "Brain",
+    "name": {
+      "it": "Encefalo",
+      "en": "Brain"
+    },
+    "latinName": "Encephalon",
+    "system": "nervous",
+    "region": "head",
+    "description": {
+      "it": "Centro del sistema nervoso, sede delle funzioni cognitive superiori.",
+      "en": "Center of nervous system, seat of higher cognitive functions."
+    },
+    "functions": [
+      "Controllo funzioni vitali",
+      "Elaborazione sensoriale",
+      "Motricità volontaria",
+      "Cognizione, memoria, emozioni"
+    ],
+    "parts": ["Cervello (emisferi)", "Cervelletto", "Tronco encefalico", "Diencefalo"],
+    "vascularization": "Arterie carotidi interne, vertebrali (poligono di Willis)",
+    "clinicalNotes": "Ictus, epilessia, tumori, malattie neurodegenerative"
+  },
+  "spinal_cord": {
+    "id": "spinal_cord",
+    "meshName": "Spinal_cord",
+    "name": {
+      "it": "Midollo spinale",
+      "en": "Spinal cord"
+    },
+    "latinName": "Medulla spinalis",
+    "system": "nervous",
+    "region": "thorax",
+    "description": {
+      "it": "Continuazione del tronco encefalico nel canale vertebrale.",
+      "en": "Continuation of brainstem in vertebral canal."
+    },
+    "functions": [
+      "Conduzione segnali sensori/motori",
+      "Riflessi spinali"
+    ],
+    "parts": ["Cervicale", "Toracica", "Lombare", "Sacrale", "Cono midollare", "Filum terminale"],
+    "clinicalNotes": "Lesioni midollari, sclerosi multipla, siringomielia"
+  },
+  "sciatic_nerve": {
+    "id": "sciatic_nerve",
+    "meshName": "Sciatic_nerve",
+    "name": {
+      "it": "Nervo sciatico",
+      "en": "Sciatic nerve"
+    },
+    "latinName": "Nervus ischiadicus",
+    "system": "nervous",
+    "region": "lower_limb",
+    "description": {
+      "it": "Nervo più grande del corpo, innerva arto inferiore posteriore.",
+      "en": "Largest nerve in body, innervates posterior lower limb."
+    },
+    "functions": [
+      "Innervazione motoria/sensitiva arto inferiore",
+      "Riflesso rotuleo (L4) e achilleo (S1)"
+    ],
+    "parts": ["Plesso sacrale (L4-S3)", "Nervo tibiale", "Nervo peroneo comune"],
+    "clinicalNotes": "Sciatalgia, ernia discale L5-S1, compressione piriforme"
+  }
+}

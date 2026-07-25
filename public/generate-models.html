@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Generate Minimal GLB Test Models</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #0d1117; color: #e6edf3; }
+    button { padding: 12px 24px; font-size: 16px; background: #58a6ff; border: none; border-radius: 6px; color: white; cursor: pointer; }
+    button:disabled { background: #30363d; cursor: not-allowed; }
+    #log { margin-top: 20px; padding: 16px; background: #161b22; border: 1px solid #30363d; border-radius: 6px; white-space: pre-wrap; max-height: 400px; overflow: auto; }
+  </style>
+</head>
+<body>
+  <h1>Generate Minimal GLB Test Models</h1>
+  <button id="generateBtn">Generate muscular.glb & skeletal.glb</button>
+  <div id="log"></div>
+
+  <script>
+    const btn = document.getElementById('generateBtn');
+    const log = document.getElementById('log');
+
+    function addLog(msg) {
+      log.textContent += msg + '\n';
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function createMinimalGLB(json) {
+      const jsonStr = '{"asset":{"version":"2.0"},"nodes":[{"name":"muscular"}],"scenes":[{"nodes":[0]}]}';
+      const jsonBytes = new TextEncoder().encode(jsonStr);
+      const padding = jsonBytes.length % 4 === 0 ? 0 : 4 - (jsonBytes.length % 4);
+      const paddedLength = jsonBytes.length + padding;
+      const buffer = new ArrayBuffer(12 + 8 + paddedLength);
+      const view = new DataView(buffer);
+
+      view.setUint32(0, buffer.byteLength, true);
+      view.setUint32(4, 0x46546C67, true);
+      view.setUint32(12, paddedLength, true);
+      view.setUint32(16, 0x4E4F534A, true);
+      for (let i = 0; i < jsonBytes.length; i++) {
+        view.setUint8(24 + i, jsonBytes[i]);
+      }
+
+      return new Uint8Array(buffer);
+    }
+
+    function download(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    async function generateAndDownload() {
+      btn.disabled = true;
+      btn.textContent = 'Generating...';
+      log.textContent = '';
+
+      try {
+        addLog('Generating files...');
+        const muscularBytes = createMinimalGLB();
+        const muscularBlob = new Blob([muscularBytes], { type: 'model/gltf-binary' });
+        download(muscularBlob, 'muscular.glb');
+        addLog(`muscular.glb generated: ${muscularBlob.size} bytes`);
+
+        const skeletalBytes = createMinimalGLB();
+        const skeletalBlob = new Blob([skeletalBytes], { type: 'model/gltf-binary' });
+        download(skeletalBlob, 'skeletal.glb');
+        addLog(`skeletal.glb generated: ${skeletalBlob.size} bytes`);
+        addLog('Done!');
+      } catch (error) {
+        addLog('Error: ' + error.message + '\n' + error.stack);
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'Generate muscular.glb & skeletal.glb';
+    }
+
+    btn.addEventListener('click', generateAndDownload);
+  </script>
+</body>
+</html>

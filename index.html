@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Atlante anatomico 3D interattivo - Z-Anatomy">
+  <title>Z-Anatomy - Atlante Anatomico 3D</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles/main.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <h1 class="logo">Z-Anatomy</h1>
+      </div>
+      <div class="header-center">
+        <div class="search-container">
+          <input type="text" id="searchInput" class="search-input" placeholder="Cerca una struttura anatomica..." autocomplete="off">
+          <div id="searchResults" class="search-results"></div>
+        </div>
+      </div>
+      <div class="header-right">
+        <select id="langSelect" class="lang-select" aria-label="Lingua">
+          <option value="it">IT</option>
+          <option value="en">EN</option>
+        </select>
+        <button id="helpBtn" class="btn-icon" aria-label="Aiuto" title="Aiuto">?</button>
+      </div>
+    </header>
+
+    <!-- Main layout -->
+    <main class="main-layout">
+      <!-- Sidebar - Systems -->
+      <aside class="sidebar sidebar-systems" id="systemsSidebar">
+        <div class="sidebar-header">
+          <h2>Sistemi Anatomici</h2>
+          <button class="sidebar-toggle" id="systemsToggle" aria-label="Chiudi sistemi">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="sidebar-content" id="systemsList"></div>
+      </aside>
+
+      <!-- 3D Viewer -->
+      <section class="viewer-section">
+        <div id="viewerContainer" class="viewer-container">
+          <canvas id="threeCanvas"></canvas>
+          <div id="loadingOverlay" class="loading-overlay">
+            <div class="loading-spinner"></div>
+            <span class="loading-text">Caricamento modello 3D...</span>
+          </div>
+        </div>
+        <div class="viewer-controls" id="viewerControls">
+          <button class="control-btn" id="resetBtn" title="Reset vista">Reset</button>
+          <button class="control-btn" id="isolateBtn" title="Isola struttura selezionata">Isola</button>
+          <button class="control-btn" id="hideBtn" title="Nascondi struttura selezionata">Nascondi</button>
+          <button class="control-btn" id="transparentBtn" title="Trasparenza struttura selezionata">Trasparenza</button>
+          <button class="control-btn" id="frontViewBtn" title="Vista anteriore">Anteriore</button>
+          <button class="control-btn" id="sideViewBtn" title="Vista laterale">Laterale</button>
+          <button class="control-btn" id="backViewBtn" title="Vista posteriore">Posteriore</button>
+          <button class="control-btn" id="topViewBtn" title="Vista superiore">Superiore</button>
+        </div>
+      </section>
+
+      <!-- Sidebar - Info Panel -->
+      <aside class="sidebar sidebar-info" id="infoSidebar">
+        <div class="sidebar-header">
+          <h2>Informazioni</h2>
+          <button class="sidebar-toggle" id="infoToggle" aria-label="Chiudi info">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="sidebar-content" id="infoContent">
+          <div class="info-placeholder">
+            <svg class="placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            </svg>
+            <p>Seleziona una struttura anatomica</p>
+            <span class="hint">Clicca sul modello 3D per visualizzare le informazioni</span>
+          </div>
+          <div id="structureInfo" class="structure-info hidden"></div>
+        </div>
+      </aside>
+    </main>
+
+    <!-- Bottom bar - Actions for selected structure -->
+    <footer class="footer-bar" id="footerBar" style="display: none;">
+      <div class="footer-actions">
+        <button class="action-btn" id="footerIsolateBtn">Isola</button>
+        <button class="action-btn" id="footerHideBtn">Nascondi</button>
+        <button class="action-btn" id="footerTransparentBtn">Trasparenza</button>
+        <button class="action-btn secondary" id="footerShowAllBtn">Mostra tutto</button>
+      </div>
+    </footer>
+
+    <!-- Help Modal -->
+    <div class="modal hidden" id="helpModal" role="dialog" aria-labelledby="helpTitle" aria-modal="true">
+      <div class="modal-overlay"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="helpTitle">Comandi</h3>
+          <button class="modal-close" id="helpClose" aria-label="Chiudi">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="help-section">
+            <h4>Computer</h4>
+            <ul>
+              <li><kbd>Trascina sinistro</kbd> Ruota</li>
+              <li><kbd>Rotellina</kbd> Zoom</li>
+              <li><kbd>Trascina destro</kbd> Sposta</li>
+              <li><kbd>Doppio clic</kbd> Avvicina struttura</li>
+            </ul>
+          </div>
+          <div class="help-section">
+            <h4>Smartphone</h4>
+            <ul>
+              <li><kbd>1 dito</kbd> Ruota</li>
+              <li><kbd>Pizzica 2 dita</kbd> Zoom</li>
+              <li><kbd>Trascina 2 dita</kbd> Sposta</li>
+              <li><kbd>Tocco</kbd> Seleziona</li>
+            </ul>
+          </div>
+          <div class="help-section">
+            <h4>Controlli</h4>
+            <ul>
+              <li>Pannello laterale: Sistemi anatomici</li>
+              <li>Pannello destro: Info struttura</li>
+              <li>Barra inferiore: Azioni su selezione</li>
+              <li>Barra comandi: Viste predefinite</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

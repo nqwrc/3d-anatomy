@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Generate Skeletal</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #0d1117; color: #e6edf3; }
+    button { padding: 12px 24px; font-size: 16px; background: #58a6ff; border: none; border-radius: 6px; color: white; cursor: pointer; }
+    button:disabled { background: #30363d; cursor: not-allowed; }
+    #log { margin-top: 20px; padding: 16px; background: #161b22; border: 1px solid #30363d; border-radius: 6px; white-space: pre-wrap; max-height: 400px; overflow: auto; }
+  </style>
+</head>
+<body>
+  <h1>Generate Skeletal Model</h1>
+  <button id="generateBtn">Generate skeletal.glb</button>
+  <div id="log"></div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "/node_modules/three/build/three.module.js",
+      "three/addons/": "/node_modules/three/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+
+    const exporter = new GLTFExporter();
+    const btn = document.getElementById('generateBtn');
+    const log = document.getElementById('log');
+
+    function addLog(msg) {
+      log.textContent += msg + '\n';
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function createSkeletalModel() {
+      const group = new THREE.Group();
+      group.name = 'skeletal';
+      
+      const boneMaterial = new THREE.MeshStandardMaterial({
+        color: 0xf5f5dc,
+        roughness: 0.9,
+        metalness: 0.0
+      });
+      
+      const bones = [
+        ['Skull', 0, 42, 0, 'sphere', 8, 8, 8],
+        ['Vertebral_column', 0, 5, 0, 'capsule', 4, 40, 4],
+        ['Rib_cage', 0, 20, 0, 'box', 14, 12, 10],
+        ['Scapula_left', -12, 30, -4, 'box', 6, 8, 2],
+        ['Scapula_right', 12, 30, -4, 'box', 6, 8, 2],
+        ['Clavicle_left', -8, 38, 6, 'capsule', 10, 1, 1],
+        ['Clavicle_right', 8, 38, 6, 'capsule', 10, 1, 1],
+        ['Humerus_left', -18, 25, 0, 'capsule', 3, 26, 3],
+        ['Humerus_right', 18, 25, 0, 'capsule', 3, 26, 3],
+        ['Radius_left', -20, 5, 2, 'capsule', 2, 20, 2],
+        ['Radius_right', 20, 5, 2, 'capsule', 2, 20, 2],
+        ['Ulna_left', -22, 5, -2, 'capsule', 2, 20, 2],
+        ['Ulna_right', 22, 5, -2, 'capsule', 2, 20, 2],
+        ['Pelvis', 0, -8, 0, 'box', 16, 6, 10],
+        ['Femur_left', -8, -20, 0, 'capsule', 3, 34, 3],
+        ['Femur_right', 8, -20, 0, 'capsule', 3, 34, 3],
+        ['Patella_left', -8, -38, 6, 'box', 3, 3, 2],
+        ['Patella_right', 8, -38, 6, 'box', 3, 3, 2],
+        ['Tibia_left', -8, -48, 0, 'capsule', 2, 30, 2],
+        ['Tibia_right', 8, -48, 0, 'capsule', 2, 30, 2],
+        ['Fibula_left', -10, -48, 0, 'capsule', 1.5, 30, 1.5],
+        ['Fibula_right', 10, -48, 0, 'capsule', 1.5, 30, 1.5],
+        ['Hand_left', -15, -8, 0, 'box', 4, 3, 3],
+        ['Hand_right', 15, -8, 0, 'box', 4, 3, 3],
+        ['Foot_left', -8, -65, 5, 'box', 4, 2, 8],
+        ['Foot_right', 8, -65, 5, 'box', 4, 2, 8]
+      ];
+      
+      bones.forEach(b => {
+        const name = b[0];
+        const px = b[1], py = b[2], pz = b[3];
+        const type = b[4];
+        const sx = b[5], sy = b[6], sz = b[7];
+        
+        let geometry;
+        if (type === 'box') {
+          geometry = new THREE.BoxGeometry(sx, sy, sz);
+        } else if (type === 'sphere') {
+          geometry = new THREE.SphereGeometry(sx, 16, 16);
+        } else {
+          geometry = new THREE.CapsuleGeometry(sx, sy, 8, 16);
+        }
+        
+        const mesh = new THREE.Mesh(geometry, boneMaterial.clone());
+        mesh.name = name;
+        mesh.position.set(px, py, pz);
+        mesh.userData = { originalName: name, system: 'skeletal' };
+        group.add(mesh);
+      });
+      
+      return group;
+    }
+    
+    async function generateAndDownload() {
+      btn.disabled = true;
+      btn.textContent = 'Generating...';
+      log.textContent = 'Starting skeletal model generation...\n';
+      
+      try {
+        const skeletal = createSkeletalModel();
+        log.textContent += `Skeletal model: ${skeletal.children.length} meshes\n`;
+        
+        const skeletalData = await new Promise((resolve, reject) => {
+          exporter.parse(skeletal, resolve, reject, { binary: true });
+        });
+        
+        const skeletalBlob = new Blob([skeletalData], { type: 'model/gltf-binary' });
+        const skeletalUrl = URL.createObjectURL(skeletalBlob);
+        const a = document.createElement('a');
+        a.href = skeletalUrl;
+        a.download = 'skeletal.glb';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(skeletalUrl);
+        log.textContent += `skeletal.glb downloaded! Size: ${skeletalBlob.size} bytes\nDone!\n`;
+      } catch (error) {
+        log.textContent += 'Error: ' + error.message + '\n' + error.stack + '\n';
+        console.error(error);
+      }
+      
+      btn.disabled = false;
+      btn.textContent = 'Generate skeletal.glb';
+    }
+    
+    btn.addEventListener('click', generateAndDownload);
+  </script>
+</body>
+</html>

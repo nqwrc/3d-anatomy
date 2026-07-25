@@ -1,0 +1,44 @@
+{
+  "head": [
+    "skull",
+    "brain"
+  ],
+  "neck": [
+    "trapezius"
+  ],
+  "thorax": [
+    "pectoralis_major",
+    "latissimus_dorsi",
+    "trapezius",
+    "vertebral_column",
+    "rib_cage",
+    "heart",
+    "lung_right",
+    "lung_left",
+    "spinal_cord"
+  ],
+  "abdomen": [
+    "rectus_abdominis",
+    "external_oblique",
+    "liver",
+    "stomach",
+    "kidney_right"
+  ],
+  "upper_limb": [
+    "deltoid",
+    "biceps_brachii",
+    "triceps_brachii",
+    "pectoralis_major",
+    "latissimus_dorsi",
+    "humerus",
+    "radius",
+    "ulna",
+    "scapula",
+    "clavicle"
+  ],
+  "lower_limb": [
+    "femur",
+    "tibia",
+    "sciatic_nerve"
+  ]
+}

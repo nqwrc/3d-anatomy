@@ -1,0 +1,31 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Heavy binary assets under public/ (~900 MB): Blender sources, their .blend1
+# autosaves and downloaded archives. Git without LFS cannot carry these sanely.
+# Revisit with Git LFS if they need to be versioned or mirrored between machines.
+*.blend
+*.blend1
+*.zip
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
