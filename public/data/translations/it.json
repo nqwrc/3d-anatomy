@@ -81,5 +81,6 @@
   "region_abdomen": "Addome",
   "region_upper_limb": "Arto superiore",
   "region_lower_limb": "Arto inferiore",
-  "no_results": "Nessun risultato"
+  "no_results": "Nessun risultato",
+  "retry": "Riprova"
 }

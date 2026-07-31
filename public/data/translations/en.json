@@ -81,5 +81,6 @@
   "region_abdomen": "Abdomen",
   "region_upper_limb": "Upper limb",
   "region_lower_limb": "Lower limb",
-  "no_results": "No results"
+  "no_results": "No results",
+  "retry": "Retry"
 }

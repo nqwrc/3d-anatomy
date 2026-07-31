@@ -11,6 +11,9 @@ const TAP_MAX_MOVE_PX = 10;
 const TAP_MAX_DURATION_MS = 300;
 
 let raycaster = new THREE.Raycaster();
+// With a BVH in place, stopping at the nearest hit is much cheaper than
+// sorting every intersection along the ray.
+raycaster.firstHitOnly = true;
 let mouse = new THREE.Vector2();
 let lastSelectedMesh = null;
 let lastIntersectedMesh = null;

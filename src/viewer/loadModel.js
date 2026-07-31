@@ -2,13 +2,23 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
+import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
 import { state, setLoadingSystem } from '../state/store.js';
 import { asset } from '../utils/paths.js';
+
+// Without an acceleration structure, picking cost grows with the triangle
+// count: 10.4M triangles tested per pointer event across seven systems.
+THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
+THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
+THREE.Mesh.prototype.raycast = acceleratedRaycast;
 
 // The Z-Anatomy models are exported with Draco compression, so the decoder
 // (copied into public/draco) is required to read them.
 const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath(asset('draco/'));
+// Fetch the decoder alongside the first model instead of after it: otherwise
+// the two requests are serialised on the critical path.
+dracoLoader.preload();
 
 let meshRegistry = new Map(); // Map<partId, node>
 let structures = new Map(); // Map<partId, { node, systemId, parentId, childIds, ownMeshes }>
@@ -60,11 +70,11 @@ export function getLoadedSystems() {
 }
 
 export async function loadModel(systemId, viewer, options = {}) {
-  const { scene } = viewer;
+  const { scene, renderer, camera } = viewer;
 
   console.log(`[loadModel] Starting load of ${systemId}.glb`);
-  
-  return new Promise((resolve, reject) => {
+
+  const gltf = await new Promise((resolve, reject) => {
     const loader = new GLTFLoader(loadingManager);
     loader.setDRACOLoader(dracoLoader);
     const modelPath = asset(`models/${systemId}.glb`);
@@ -73,31 +83,43 @@ export async function loadModel(systemId, viewer, options = {}) {
 
     loader.load(
       modelPath,
-      (gltf) => {
-        console.log(`[loadModel] Successfully loaded ${systemId}.glb`);
-        const model = gltf.scene;
-        processModel(model, systemId, viewer);
-        scene.add(model);
-        modelRoots.set(systemId, model);
-
-        state.loadedSystems.push(systemId);
-        setLoadingSystem(systemId, true, 100);
-
-        resolve({ systemId, model, meshCount: systemRegistry.get(systemId)?.length || 0 });
-      },
+      resolve,
       (xhr) => {
-        if (xhr.lengthComputable) {
-          const progress = (xhr.loaded / xhr.total) * 100;
-          setLoadingSystem(systemId, false, progress);
-        }
+        // Bytes are reported even when the server sends no content-length, so
+        // the UI can show something either way.
+        setLoadingSystem(systemId, false, xhr.lengthComputable ? (xhr.loaded / xhr.total) * 100 : 0, {
+          loaded: xhr.loaded,
+          total: xhr.lengthComputable ? xhr.total : 0
+        });
       },
       (error) => {
         console.error(`[loadModel] Error loading ${systemId}:`, error);
-        setLoadingSystem(systemId, true, 100);
+        setLoadingSystem(systemId, true, 100, { failed: true });
         reject(error);
       }
     );
   });
+
+  const model = gltf.scene;
+  processModel(model, systemId, viewer);
+
+  // Compiling before the model joins the scene keeps the first frame after a
+  // load from stalling on shader and buffer upload.
+  if (renderer?.compileAsync) {
+    try {
+      await renderer.compileAsync(model, camera, scene);
+    } catch {
+      // Compilation is an optimisation; a failure must not block the load.
+    }
+  }
+
+  scene.add(model);
+  modelRoots.set(systemId, model);
+
+  state.loadedSystems.push(systemId);
+  setLoadingSystem(systemId, true, 100);
+
+  return { systemId, model, meshCount: systemRegistry.get(systemId)?.length || 0 };
 }
 
 function processModel(model, systemId, viewer) {
@@ -175,40 +197,19 @@ function findAncestorPartId(node) {
 }
 
 function setupMesh(mesh, systemId, viewer) {
-  // Idempotent: a mesh must not have its material snapshot taken twice.
-  if (mesh.userData.originalMaterial) return;
+  // Idempotent: a mesh must not be set up twice.
+  if (mesh.userData.baseMaterial) return;
 
-  // Clone material to avoid shared material issues
+  // The GLB ships ~142 materials shared across thousands of meshes. Cloning one
+  // per mesh used to produce 3499 distinct materials, which defeats three.js
+  // render-state sorting. Keep the shared reference and clone only when a mesh
+  // is actually modified — see viewer/visibility.js.
   if (mesh.material) {
-    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    mesh.userData.baseMaterial = mesh.material;
+  }
 
-    materials.forEach((mat, i) => {
-      const clonedMat = mat.clone();
-      mesh.material = materials.length > 1 ? materials.map(m => m.clone()) : clonedMat;
-
-      // Store original material properties for restoration
-      if (!mesh.userData.originalMaterial) {
-        mesh.userData.originalMaterial = [];
-      }
-      mesh.userData.originalMaterial[i] = {
-        color: mat.color ? mat.color.clone() : new THREE.Color(0xffffff),
-        opacity: mat.opacity !== undefined ? mat.opacity : 1,
-        transparent: mat.transparent || false,
-        side: mat.side || THREE.FrontSide,
-        depthWrite: mat.depthWrite !== undefined ? mat.depthWrite : true,
-        emissive: mat.emissive ? mat.emissive.clone() : new THREE.Color(0x000000),
-        emissiveIntensity: mat.emissiveIntensity || 1,
-        metalness: mat.metalness !== undefined ? mat.metalness : 0,
-        roughness: mat.roughness !== undefined ? mat.roughness : 1
-      };
-    });
-
-    // Ensure materials are ready
-    if (Array.isArray(mesh.material)) {
-      mesh.material.forEach(m => m.needsUpdate = true);
-    } else {
-      mesh.material.needsUpdate = true;
-    }
+  if (mesh.geometry && !mesh.geometry.boundsTree) {
+    mesh.geometry.computeBoundsTree();
   }
 
   // Enable shadows if needed (disabled for performance in v1)
@@ -310,6 +311,46 @@ export function getMeshesBySystem(systemId) {
 // structure are not counted twice.
 export function getAllMeshes() {
   return Array.from(structures.values()).flatMap(entry => entry.ownMeshes);
+}
+
+// Frees a system's GPU buffers. Without this, memory only ever grows: seven
+// systems is roughly 187 MB that a mobile tab never gets back.
+export function unloadSystem(systemId) {
+  const model = modelRoots.get(systemId);
+  if (!model) return false;
+
+  model.removeFromParent();
+
+  const seenMaterials = new Set();
+  model.traverse(object => {
+    if (!object.isMesh) return;
+
+    object.geometry?.disposeBoundsTree?.();
+    object.geometry?.dispose();
+
+    const materials = [object.material, object.userData.baseMaterial]
+      .flatMap(entry => (Array.isArray(entry) ? entry : [entry]))
+      .filter(Boolean);
+
+    materials.forEach(material => {
+      if (seenMaterials.has(material)) return;
+      seenMaterials.add(material);
+      material.dispose();
+    });
+  });
+
+  structures.forEach((entry, partId) => {
+    if (entry.systemId !== systemId) return;
+    structures.delete(partId);
+    meshRegistry.delete(partId);
+    state.partStates.delete(partId);
+  });
+
+  systemRegistry.delete(systemId);
+  modelRoots.delete(systemId);
+  state.loadedSystems = state.loadedSystems.filter(id => id !== systemId);
+
+  return true;
 }
 
 // Visibility, transparency and highlighting all live in viewer/visibility.js,

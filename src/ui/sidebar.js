@@ -1,6 +1,6 @@
 // Sidebar UI - Systems panel with collapsible groups
 import { state, subscribe, getSystemParts, getStructureInfo, setLanguage, translate } from '../state/store.js';
-import { getMeshRegistry, loadModel } from '../viewer/loadModel.js';
+import { getMeshRegistry, loadModel, unloadSystem } from '../viewer/loadModel.js';
 import { SYSTEM_IDS } from '../data/anatomy.js';
 import { hideSystem, showSystem, hidePart, showPart, isolatePart, setPartTransparency, getSystemVisibilityState } from '../viewer/visibility.js';
 import { selectPartById, deselectPart } from '../viewer/selection.js';
@@ -84,8 +84,11 @@ export function initSystemsSidebar() {
       if (!e.target.checked) {
         hideSystem(systemId);
         content.style.display = 'none';
+        scheduleUnload(systemId, content);
         return;
       }
+
+      cancelUnload(systemId);
 
       // Models are fetched on first activation, not upfront.
       await ensureSystemLoaded(systemId, group);
@@ -127,6 +130,27 @@ export async function selectStructureAnywhere(partId) {
   selectPartById(partId, state.viewer);
 }
 
+// Hiding a system is instant, but its buffers are only released if it stays
+// off: toggling twice in a row should not pay for a reload.
+const UNLOAD_GRACE_MS = 30000;
+const pendingUnloads = new Map();
+
+function scheduleUnload(systemId, content) {
+  cancelUnload(systemId);
+  pendingUnloads.set(systemId, setTimeout(() => {
+    pendingUnloads.delete(systemId);
+    if (unloadSystem(systemId) && content) content.innerHTML = '';
+  }, UNLOAD_GRACE_MS));
+}
+
+function cancelUnload(systemId) {
+  const timer = pendingUnloads.get(systemId);
+  if (timer) {
+    clearTimeout(timer);
+    pendingUnloads.delete(systemId);
+  }
+}
+
 const pendingSystemLoads = new Map();
 
 async function ensureSystemLoaded(systemId, group) {
@@ -134,14 +158,30 @@ async function ensureSystemLoaded(systemId, group) {
 
   if (!pendingSystemLoads.has(systemId)) {
     const label = group?.querySelector('.system-group-label');
+    const counter = label?.querySelector('.system-count');
+    const originalCount = counter?.textContent;
     label?.classList.add('loading');
+
+    // The bytes were already being measured and thrown away; show them.
+    const unsubscribe = subscribe('loading', info => {
+      if (!counter || info.system !== systemId || info.loaded) return;
+      counter.textContent = info.total
+        ? `${Math.round(info.loaded / 1048576 * 10) / 10}/${Math.round(info.total / 1048576 * 10) / 10} MB`
+        : `${Math.round(info.loaded / 1048576 * 10) / 10} MB`;
+    });
 
     const promise = loadModel(systemId, state.viewer)
       .catch(error => {
         console.error(`[sidebar] Failed to load ${systemId}:`, error);
+        label?.classList.add('failed');
+        if (counter) counter.textContent = translate('retry');
       })
       .finally(() => {
+        unsubscribe?.();
         label?.classList.remove('loading');
+        if (counter && originalCount && !label?.classList.contains('failed')) {
+          counter.textContent = originalCount;
+        }
         pendingSystemLoads.delete(systemId);
       });
 

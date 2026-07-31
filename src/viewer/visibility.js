@@ -3,6 +3,50 @@ import * as THREE from 'three';
 import { state, setHiddenParts, setTransparentParts, setIsolatedPart, getPartState, setPartState, batchPartStates, notify } from '../state/store.js';
 import { getMeshRegistry, getMeshesBySystem, ownMeshesOf, withDescendants } from './loadModel.js';
 
+// --- Material ownership ------------------------------------------------------
+// Meshes share the ~142 materials that came out of the GLB. A mesh only gets
+// its own copy when it is actually modified, and goes back to the shared one
+// when the modification is undone.
+
+function materialsOf(mesh) {
+  return Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+}
+
+// Clone-on-write: returns the mesh's private materials, creating them once.
+function ownMaterials(mesh) {
+  if (!mesh.userData.ownsMaterial) {
+    mesh.material = Array.isArray(mesh.material)
+      ? mesh.material.map(mat => mat.clone())
+      : mesh.material.clone();
+    mesh.userData.ownsMaterial = true;
+  }
+  return materialsOf(mesh);
+}
+
+function releaseMaterial(mesh) {
+  if (!mesh.userData.ownsMaterial) return;
+
+  materialsOf(mesh).forEach(mat => mat.dispose());
+  mesh.material = mesh.userData.baseMaterial;
+  mesh.userData.ownsMaterial = false;
+}
+
+// Ghosting touches nearly every mesh at once, so it uses one shared faded
+// variant per source material — 142 of them, not one per mesh.
+const ghostVariants = new WeakMap();
+
+function ghostVariantOf(material) {
+  let ghost = ghostVariants.get(material);
+  if (!ghost) {
+    ghost = material.clone();
+    ghost.transparent = true;
+    ghost.opacity = GHOST_OPACITY;
+    ghost.depthWrite = false;
+    ghostVariants.set(material, ghost);
+  }
+  return ghost;
+}
+
 // Visibility is applied to the meshes a structure owns, never to its node:
 // three.js propagates `visible` down the subtree, and 868 of the 2829
 // structures sit inside another one, so touching the node would take unrelated
@@ -53,8 +97,9 @@ export function setPartTransparency(partId, opacity) {
   opacity = THREE.MathUtils.clamp(opacity, 0, 1);
 
   ownMeshesOf(partId).forEach(mesh => {
-    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    materials.forEach(mat => {
+    if (opacity >= 1 && !mesh.userData.ownsMaterial) return;
+
+    ownMaterials(mesh).forEach(mat => {
       mat.transparent = opacity < 1;
       mat.opacity = opacity;
       mat.depthWrite = opacity >= 1;
@@ -200,28 +245,16 @@ export function getSystemVisibilityState(systemId) {
   };
 }
 
+// Restoring is now "point back at the shared material" rather than copying a
+// dozen properties back one by one.
 function restoreMaterial(partId) {
   ownMeshesOf(partId).forEach(mesh => {
-    if (!mesh.userData.originalMaterial) return;
-
-    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    const originals = mesh.userData.originalMaterial;
-
-    materials.forEach((mat, i) => {
-      const orig = originals[i] || originals[0];
-      if (orig) {
-        mat.color.copy(orig.color);
-        mat.opacity = orig.opacity;
-        mat.transparent = orig.transparent;
-        mat.side = orig.side;
-        mat.depthWrite = orig.depthWrite;
-        if (orig.emissive) mat.emissive.copy(orig.emissive);
-        mat.emissiveIntensity = orig.emissiveIntensity;
-        mat.metalness = orig.metalness;
-        mat.roughness = orig.roughness;
-        mat.needsUpdate = true;
-      }
-    });
+    if (mesh.userData.ownsMaterial) {
+      releaseMaterial(mesh);
+    } else if (mesh.userData.baseMaterial) {
+      // Undo a ghost swap, which does not clone.
+      mesh.material = mesh.userData.baseMaterial;
+    }
   });
 }
 
@@ -242,13 +275,12 @@ export function ghostAllExcept(partId) {
     if (!meshes.some(mesh => mesh.visible)) return;
 
     meshes.forEach(mesh => {
-      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      materials.forEach(mat => {
-        mat.transparent = true;
-        mat.opacity = GHOST_OPACITY;
-        mat.depthWrite = false;
-        mat.needsUpdate = true;
-      });
+      const source = mesh.userData.baseMaterial;
+      if (!source) return;
+
+      mesh.material = Array.isArray(source)
+        ? source.map(ghostVariantOf)
+        : ghostVariantOf(source);
     });
     ghosted.push(id);
   });
@@ -279,14 +311,9 @@ export function clearGhost() {
 // a transparency the user set.
 export function highlightMesh(partId, color = 0xffdf5d, intensity = 0.5) {
   ownMeshesOf(partId).forEach(mesh => {
-    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-
-    materials.forEach(mat => {
-      if (!mat.userData.originalEmissive) {
-        mat.userData.originalEmissive = mat.emissive ? mat.emissive.clone() : new THREE.Color(0x000000);
-        mat.userData.originalEmissiveIntensity = mat.emissiveIntensity || 1;
-      }
-
+    // Materials are shared, so tinting one in place would light up every mesh
+    // using it; the highlighted structure gets its own copy instead.
+    ownMaterials(mesh).forEach(mat => {
       mat.emissive = new THREE.Color(color);
       mat.emissiveIntensity = intensity;
       mat.needsUpdate = true;
@@ -296,15 +323,23 @@ export function highlightMesh(partId, color = 0xffdf5d, intensity = 0.5) {
 
 export function clearHighlight(partId) {
   ownMeshesOf(partId).forEach(mesh => {
-    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    if (!mesh.userData.ownsMaterial) return;
 
-    materials.forEach(mat => {
-      if (mat.userData.originalEmissive) {
-        mat.emissive.copy(mat.userData.originalEmissive);
-        mat.emissiveIntensity = mat.userData.originalEmissiveIntensity;
+    const opacity = getPartState(partId)?.opacity ?? 1;
+
+    // A structure the user made transparent keeps its own material; one that
+    // was only hovered goes back to the shared one.
+    if (opacity < 1) {
+      materialsOf(mesh).forEach(mat => {
+        const base = mesh.userData.baseMaterial;
+        const source = Array.isArray(base) ? base[0] : base;
+        if (source?.emissive) mat.emissive.copy(source.emissive);
+        mat.emissiveIntensity = source?.emissiveIntensity ?? 1;
         mat.needsUpdate = true;
-      }
-    });
+      });
+    } else {
+      releaseMaterial(mesh);
+    }
   });
 }
 

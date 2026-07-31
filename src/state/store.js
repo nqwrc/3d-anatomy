@@ -71,6 +71,11 @@ export function notify(key, value) {
   if (subscribers.has(key)) {
     subscribers.get(key).forEach(cb => cb(value));
   }
+
+  // Rendering is on demand, so anything that changes the scene has to ask for
+  // a frame. Every mutation already goes through notify(), and requesting one
+  // is just setting a flag.
+  state.viewer?.render?.();
 }
 
 // State setters with notification
@@ -167,13 +172,13 @@ export function setAnimating(animating) {
   notify('isAnimating', animating);
 }
 
-export function setLoadingSystem(system, loaded, progress = 100) {
-  state.loading.systems[system] = { loaded, progress };
+export function setLoadingSystem(system, loaded, progress = 100, detail = {}) {
+  state.loading.systems[system] = { loaded, progress, ...detail };
   const loadedCount = Object.values(state.loading.systems).filter(s => s.loaded).length;
   const totalCount = Object.keys(state.loading.systems).length;
   state.loading.progress = totalCount > 0 ? (loadedCount / totalCount) * 100 : 0;
   state.loading.total = totalCount;
-  notify('loading', { ...state.loading });
+  notify('loading', { ...state.loading, system, ...state.loading.systems[system] });
 }
 
 export function setViewer(viewer) {

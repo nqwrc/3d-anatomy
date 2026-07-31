@@ -25,6 +25,7 @@ export const translationsIt = {
   "no_data_available": "Nessuna informazione disponibile per questa struttura",
   "structure_not_found": "Struttura non trovata",
   "no_results": "Nessun risultato",
+  "retry": "Riprova",
   "error_loading_model": "Errore nel caricamento del modello",
   "error_loading_data": "Errore nel caricamento dei dati",
 
@@ -125,6 +126,7 @@ export const translationsEn = {
   "no_data_available": "No information available for this structure",
   "structure_not_found": "Structure not found",
   "no_results": "No results",
+  "retry": "Retry",
   "error_loading_model": "Error loading model",
   "error_loading_data": "Error loading data",
 

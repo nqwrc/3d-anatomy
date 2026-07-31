@@ -72,16 +72,27 @@ export function createScene() {
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
     renderer.setSize(width, height);
+    invalidate();
   }
 
   window.addEventListener('resize', onResize);
 
-  // Animation loop
+  // Animation loop. Frames are drawn on demand: continuously redrawing up to
+  // 10.4M triangles while the user reads the page costs battery and fans for
+  // an image that does not change.
   let animationId = null;
-  let lastRenderTime = 0;
-  const minFrameInterval = 1000 / 60; // 60fps cap
-  let frameCount = 0;
-  let lastFpsUpdate = 0;
+  let needsRender = true;
+  let settleFrames = 0;
+
+  // Damping keeps moving the camera for a while after input stops.
+  const SETTLE_FRAMES = 30;
+
+  function invalidate(frames = 1) {
+    needsRender = true;
+    settleFrames = Math.max(settleFrames, frames);
+  }
+
+  controls.addEventListener('change', () => invalidate(SETTLE_FRAMES));
 
   // Per-frame subscribers, used by overlays that must track a 3D point on
   // screen (the selection callout).
@@ -92,30 +103,25 @@ export function createScene() {
     return () => frameCallbacks.delete(callback);
   }
 
-  function animate(time) {
+  function animate() {
     animationId = requestAnimationFrame(animate);
 
-    // Throttle to 60fps
-    if (time - lastRenderTime < minFrameInterval) return;
-    lastRenderTime = time;
+    // `controls.update()` returns true while damping is still moving things.
+    const moving = controls.update();
+    if (moving) settleFrames = Math.max(settleFrames, 2);
 
-    // Heartbeat to detect actual rendering
-    frameCount++;
-    if (!lastFpsUpdate) lastFpsUpdate = time;
-    if (time - lastFpsUpdate > 1000) {
-      console.log(`[viewer] render heartbeat ~${frameCount}fps`);
-      frameCount = 0;
-      lastFpsUpdate = time;
-    }
+    if (!needsRender && settleFrames <= 0) return;
+    if (settleFrames > 0) settleFrames--;
+    needsRender = false;
 
-    controls.update();
     renderer.render(scene, camera);
     frameCallbacks.forEach(cb => cb());
   }
 
   function startRenderLoop() {
     if (!animationId) {
-      animate(0);
+      invalidate();
+      animate();
     }
   }
 
@@ -126,10 +132,10 @@ export function createScene() {
     }
   }
 
-  // Render on demand (for performance)
+  // Anything that changes the scene without touching the camera (loading a
+  // model, hiding a structure, highlighting) calls this to ask for a frame.
   function render() {
-    controls.update();
-    renderer.render(scene, camera);
+    invalidate();
   }
 
   // Cleanup
