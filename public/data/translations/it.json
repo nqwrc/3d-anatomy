@@ -82,5 +82,6 @@
   "region_upper_limb": "Arto superiore",
   "region_lower_limb": "Arto inferiore",
   "no_results": "Nessun risultato",
-  "retry": "Riprova"
+  "retry": "Riprova",
+  "depth": "Profondità"
 }

@@ -201,7 +201,7 @@ export function selectPart(partId, viewer) {
   const partData = {
     id: partId,
     meshName: mesh.userData.originalName || mesh.name,
-    displayName: info?.name?.it || info?.name?.en || partId,
+    displayName: info?.name?.[state.language] || info?.name?.en || partId,
     system: info?.system || mesh.userData.system || 'unknown',
     region: info?.region || 'unknown',
     info: info

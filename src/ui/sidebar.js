@@ -2,10 +2,12 @@
 import { state, subscribe, getSystemParts, getStructureInfo, setLanguage, translate } from '../state/store.js';
 import { getMeshRegistry, loadModel, unloadSystem } from '../viewer/loadModel.js';
 import { SYSTEM_IDS } from '../data/anatomy.js';
-import { hideSystem, showSystem, hidePart, showPart, isolatePart, setPartTransparency, getSystemVisibilityState } from '../viewer/visibility.js';
+import { hideSystem, showSystem, hidePart, showPart, isolatePart, setPartTransparency, restoreAllParts, getSystemVisibilityState } from '../viewer/visibility.js';
 import { selectPartById, deselectPart } from '../viewer/selection.js';
 import { setView, resetView } from '../viewer/camera.js';
 import { loadAllData, searchStructures } from '../utils/dataLoader.js';
+import { initDepthSlider, resetDepthSlider } from './depthSlider.js';
+import { PRESETS, applyPreset } from '../data/presets.js';
 
 // Systems as they are organised in the Z-Anatomy source file. Respiratory,
 // digestive and urinary structures all live in the single "visceral" model.
@@ -48,9 +50,19 @@ export function initSystemsSidebar() {
   const container = document.getElementById('systemsList');
   if (!container) return;
 
-  const lang = state.language || 'it';
+  const lang = state.language || 'en';
 
-  container.innerHTML = SYSTEM_IDS.map(systemId => {
+  const presets = `
+    <div class="preset-row">
+      ${PRESETS.map(preset => `
+        <button type="button" class="preset-chip" data-preset="${preset.id}">
+          ${escapeHtml(preset.label[lang] || preset.label.en)}
+        </button>
+      `).join('')}
+    </div>
+  `;
+
+  container.innerHTML = presets + SYSTEM_IDS.map(systemId => {
     const parts = getSystemParts(systemId);
     const count = parts.length;
     const icon = SYSTEM_ICONS[systemId] || '🔬';
@@ -74,12 +86,22 @@ export function initSystemsSidebar() {
     `;
   }).join('');
 
+  container.querySelectorAll('[data-preset]').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const preset = PRESETS.find(p => p.id === chip.dataset.preset);
+      if (preset) applyPreset(preset);
+    });
+  });
+
   // Add event listeners for system toggles
   container.querySelectorAll('[data-system-checkbox]').forEach(checkbox => {
     checkbox.addEventListener('change', async (e) => {
       const systemId = e.target.dataset.systemCheckbox;
       const group = e.target.closest('.system-group');
       const content = group.querySelector('.system-group-content');
+
+      // A manual toggle invalidates the depth slider's picture of the scene.
+      resetDepthSlider();
 
       if (!e.target.checked) {
         hideSystem(systemId);
@@ -363,11 +385,10 @@ function escapeHtml(text) {
 
 // Initialize toolbar buttons
 export function initToolbar(viewer) {
+  // Isolate / hide / transparency are on the callout and the action bar; the
+  // toolbar only carries camera presets.
   const buttons = {
     resetBtn: () => resetView(viewer),
-    isolateBtn: () => isolateSelected(),
-    hideBtn: () => hideSelected(),
-    transparentBtn: () => toggleTransparencySelected(),
     frontViewBtn: () => setView('front', viewer),
     sideViewBtn: () => setView('right', viewer),
     backViewBtn: () => setView('back', viewer),
@@ -406,7 +427,9 @@ export function initFooterActions(viewer) {
     footerIsolateBtn: () => isolateSelected(),
     footerHideBtn: () => hideSelected(),
     footerTransparentBtn: () => toggleTransparencySelected(),
-    footerShowAllBtn: () => resetView(viewer)
+    // Restoring visibility must not throw away the angle the user just chose;
+    // the camera has its own Reset in the toolbar.
+    footerShowAllBtn: () => { restoreAllParts(); deselectPart(); }
   };
 
   Object.entries(buttons).forEach(([id, handler]) => {
@@ -644,6 +667,8 @@ function updateUIText(lang) {
 // Initialize all UI
 export async function initUI(viewer) {
   await loadAllData();
+  // The markup is written in English; anything else comes from the dictionaries.
+  updateUIText(state.language);
   initSystemsSidebar();
   initToolbar(viewer);
   initFooterActions(viewer);
@@ -652,6 +677,7 @@ export async function initUI(viewer) {
   initSearch();
   initDrawers();
   initMobileSearch();
+  initDepthSlider();
 }
 
 // Under 1024px the search field is hidden; this button is the only way to it.
@@ -679,6 +705,16 @@ function initMobileSearch() {
 // On narrow layouts both sidebars slide off-canvas; these wire the header
 // buttons that bring them back and the close buttons inside them.
 function initDrawers() {
+  // On desktop the details panel is a grid column that opens on demand; below
+  // the breakpoint both panels are off-canvas drawers.
+  const app = document.getElementById('app');
+  const toggleInfo = (open) => app?.classList.toggle('info-open', open);
+
+  document.getElementById('infoOpen')?.addEventListener('click', () => {
+    toggleInfo(!app.classList.contains('info-open'));
+  });
+  document.getElementById('infoToggle')?.addEventListener('click', () => toggleInfo(false));
+
   const drawers = [
     { sidebar: 'systemsSidebar', open: 'systemsOpen', close: 'systemsToggle' },
     { sidebar: 'infoSidebar', open: 'infoOpen', close: 'infoToggle' }

@@ -69,12 +69,55 @@ export function createScene() {
   function onResize() {
     const width = canvas.clientWidth;
     const height = canvas.clientHeight;
+    if (!width || !height) return;
+
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
-    renderer.setSize(width, height);
+    // Re-read the ratio here: moving the window between displays changes it,
+    // and on mobile it changes with zoom.
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(width, height, false);
     invalidate();
   }
 
+  // Keyboard orbit, so the viewer is operable without a pointer.
+  canvas.addEventListener('keydown', event => {
+    const step = event.shiftKey ? 0.25 : 0.08;
+    const handled = {
+      ArrowLeft: () => controls.rotateLeft?.(-step) ?? rotate(-step, 0),
+      ArrowRight: () => controls.rotateLeft?.(step) ?? rotate(step, 0),
+      ArrowUp: () => controls.rotateUp?.(-step) ?? rotate(0, -step),
+      ArrowDown: () => controls.rotateUp?.(step) ?? rotate(0, step),
+      '+': () => dolly(0.9),
+      '=': () => dolly(0.9),
+      '-': () => dolly(1.1)
+    }[event.key];
+
+    if (!handled) return;
+    event.preventDefault();
+    handled();
+    controls.update();
+    invalidate();
+  });
+
+  function rotate(dTheta, dPhi) {
+    const offset = camera.position.clone().sub(controls.target);
+    const spherical = new THREE.Spherical().setFromVector3(offset);
+    spherical.theta -= dTheta;
+    spherical.phi = THREE.MathUtils.clamp(spherical.phi - dPhi, 0.05, Math.PI - 0.05);
+    camera.position.copy(controls.target).add(new THREE.Vector3().setFromSpherical(spherical));
+  }
+
+  function dolly(factor) {
+    const offset = camera.position.clone().sub(controls.target).multiplyScalar(factor);
+    const distance = THREE.MathUtils.clamp(offset.length(), controls.minDistance, controls.maxDistance);
+    camera.position.copy(controls.target).add(offset.setLength(distance));
+  }
+
+  // Watches the canvas itself, so opening or closing a panel resizes the view
+  // even though the window did not change.
+  const resizeObserver = new ResizeObserver(onResize);
+  resizeObserver.observe(canvas);
   window.addEventListener('resize', onResize);
 
   // Animation loop. Frames are drawn on demand: continuously redrawing up to
@@ -141,6 +184,7 @@ export function createScene() {
   // Cleanup
   function dispose() {
     stopRenderLoop();
+    resizeObserver.disconnect();
     window.removeEventListener('resize', onResize);
     controls.dispose();
     renderer.dispose();

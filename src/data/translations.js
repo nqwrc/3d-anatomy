@@ -26,6 +26,7 @@ export const translationsIt = {
   "structure_not_found": "Struttura non trovata",
   "no_results": "Nessun risultato",
   "retry": "Riprova",
+  "depth": "Profondità",
   "error_loading_model": "Errore nel caricamento del modello",
   "error_loading_data": "Errore nel caricamento dei dati",
 
@@ -127,6 +128,7 @@ export const translationsEn = {
   "structure_not_found": "Structure not found",
   "no_results": "No results",
   "retry": "Retry",
+  "depth": "Depth",
   "error_loading_model": "Error loading model",
   "error_loading_data": "Error loading data",
 

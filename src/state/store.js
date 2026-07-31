@@ -20,7 +20,7 @@ export const state = {
   transparentParts: new Set(),
 
   // Current language
-  language: 'it',
+  language: 'en',
 
   // Loaded data
   partsData: null,
@@ -189,8 +189,15 @@ export function getViewer() {
   return state.viewer;
 }
 
+// Returns the stored entry, creating it on first use. It used to hand back a
+// throwaway object, so callers that mutated it silently lost the change.
 export function getPartState(partId) {
-  return state.partStates.get(partId) || { visible: true, opacity: 1, selected: false };
+  let partState = state.partStates.get(partId);
+  if (!partState) {
+    partState = { visible: true, opacity: 1, selected: false };
+    state.partStates.set(partId, partState);
+  }
+  return partState;
 }
 
 export function isPartVisible(partId) {

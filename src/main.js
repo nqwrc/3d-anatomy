@@ -1,8 +1,13 @@
+import './styles/main.css';
 import { createScene } from './viewer/createScene.js';
 import { loadSystems } from './viewer/loadModel.js';
 import { initSelection } from './viewer/selection.js';
 import { initUI } from './ui/sidebar.js';
-import { setViewer, setPartsData, setSystemsData, setTranslations, setSearchIndex } from './state/store.js';
+import { setViewer, setPartsData, setSystemsData, setTranslations, setSearchIndex, subscribe } from './state/store.js';
+import { readState, storedState, applyState, scheduleStateWrite } from './state/urlState.js';
+import { loadModel } from './viewer/loadModel.js';
+import { selectPartById } from './viewer/selection.js';
+import { showPart, hidePart, setPartTransparency, isolatePart } from './viewer/visibility.js';
 import { loadSystemsData, buildPartsData, DEFAULT_SYSTEM } from './data/anatomy.js';
 import { translationsIt, translationsEn } from './data/translations.js';
 
@@ -48,9 +53,23 @@ async function init() {
     console.log(`[main] Anatomy data ready: ${Object.keys(partsData).length} structures`);
 
     if (viewer) {
-      console.log(`[main] Loading ${DEFAULT_SYSTEM} system...`);
-      await loadSystems([DEFAULT_SYSTEM], viewer);
-      console.log(`[main] ${DEFAULT_SYSTEM} system loaded`);
+      // A shared link wins over the default view; a reload falls back to
+      // whatever was last looked at.
+      const saved = readState() || storedState();
+      const systems = saved?.systems?.length ? saved.systems : [DEFAULT_SYSTEM];
+
+      console.log(`[main] Loading ${systems.join(', ')}...`);
+      await loadSystems(systems, viewer);
+
+      if (saved) {
+        await applyState(saved, {
+          loadSystem: id => loadModel(id, viewer),
+          selectPart: id => selectPartById(id, viewer),
+          setVisible: (id, visible) => (visible ? showPart(id) : hidePart(id)),
+          setTransparency: (id, opacity) => setPartTransparency(id, opacity),
+          isolate: id => isolatePart(id)
+        });
+      }
     }
   } catch (error) {
     console.error('[main] Initialization error:', error);
@@ -62,9 +81,18 @@ async function init() {
     if (viewer) {
       await initUI(viewer);
       initSelection(viewer);
+      trackViewState(viewer);
     }
     console.log('[main] Z-Anatomy initialization complete');
   }
+}
+
+// Anything that changes what the link should reproduce schedules a rewrite.
+function trackViewState(activeViewer) {
+  ['selectedPart', 'partStates', 'systemShown', 'systemHidden', 'partIsolated',
+   'allPartsRestored', 'language'].forEach(key => subscribe(key, scheduleStateWrite));
+
+  activeViewer.controls?.addEventListener('end', scheduleStateWrite);
 }
 
 console.log('[main] Calling init()...');

@@ -61,6 +61,14 @@ function getModelBounds(scene) {
 }
 
 function animateCamera(camera, controls, targetPosition, targetTarget) {
+  // A full-viewport camera flight is exactly what reduced-motion is about.
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    camera.position.copy(targetPosition);
+    controls.target.copy(targetTarget);
+    controls.update();
+    return Promise.resolve();
+  }
+
   return new Promise(resolve => {
     setAnimating(true);
 
