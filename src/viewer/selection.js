@@ -10,6 +10,10 @@ import { loadDefinitions } from '../data/anatomy.js';
 // Distinguishes a tap from the end of an orbit gesture.
 const TAP_MAX_MOVE_PX = 10;
 const TAP_MAX_DURATION_MS = 300;
+// The mouse gets a smaller threshold: a deliberate click barely moves, but an
+// orbit drag is unbounded, and there is no duration limit because rotating
+// slowly is still rotating.
+const CLICK_MAX_MOVE_PX = 5;
 
 let raycaster = new THREE.Raycaster();
 // With a BVH in place, stopping at the nearest hit is much cheaper than
@@ -19,6 +23,7 @@ let mouse = new THREE.Vector2();
 let lastSelectedMesh = null;
 let lastIntersectedMesh = null;
 let touchStart = null;
+let pointerDown = null;
 let hoverEvent = null;
 let hoverFrame = null;
 let orbiting = false;
@@ -47,6 +52,7 @@ export function initSelection(viewer) {
   controls?.addEventListener('end', () => { orbiting = false; });
 
   // Mouse events
+  canvas.addEventListener('pointerdown', onPointerDown);
   canvas.addEventListener('click', onClick);
   canvas.addEventListener('dblclick', onDoubleClick);
   canvas.addEventListener('pointermove', onPointerMove);
@@ -56,6 +62,7 @@ export function initSelection(viewer) {
   canvas.addEventListener('touchend', onTouchEnd, { passive: false });
 
   return () => {
+    canvas.removeEventListener('pointerdown', onPointerDown);
     canvas.removeEventListener('click', onClick);
     canvas.removeEventListener('dblclick', onDoubleClick);
     canvas.removeEventListener('pointermove', onPointerMove);
@@ -73,9 +80,31 @@ function getEventPosition(event, canvas) {
   mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
 }
 
+// A rotate gesture ends with a click event wherever the pointer happens to be,
+// so without this every attempt to change the angle selected whatever was under
+// the cursor. Touch had this discrimination from the start; the mouse did not.
+function onPointerDown(event) {
+  pointerDown = { x: event.clientX, y: event.clientY, type: event.pointerType };
+}
+
+function wasDrag(event, gesture) {
+  if (!gesture) return false;
+
+  const moved = Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y);
+  return moved > CLICK_MAX_MOVE_PX;
+}
+
 function onClick(event) {
   const viewer = state.viewer;
   if (!viewer) return;
+
+  const gesture = pointerDown;
+  pointerDown = null;
+
+  // Touch selects from the tap handler; the click the browser synthesises
+  // afterwards would select a second time.
+  if (gesture && gesture.type !== 'mouse') return;
+  if (wasDrag(event, gesture)) return;
 
   const structure = pickAt(event, viewer);
   if (structure) {
@@ -215,7 +244,6 @@ export function selectPart(partId, viewer) {
   // Everything else drops to a ghost, so an occluded structure is still
   // readable, and the camera eases in to answer "where is it".
   ghostAllExcept(partId);
-  if (viewer) focusOnMesh(mesh, viewer, true, 4.5);
 
   showCallout(partId, partData.displayName, {
     isolate: id => isolatePart(id),
