@@ -7,14 +7,19 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# Dependencies and build output
+node_modules/
+dist/
+dist-ssr/
+.vite/
 *.local
 
-# Heavy binary assets under public/ (~900 MB): Blender sources, their .blend1
-# autosaves and downloaded archives. Git without LFS cannot carry these sanely.
-# Revisit with Git LFS if they need to be versioned or mirrored between machines.
+# Heavy binary assets: Blender sources, their .blend1 autosaves and the
+# downloaded Z-Anatomy archives. Moved out of public/ into assets-src/ so Vite
+# never copies ~900 MB into a production build. They are still needed offline to
+# generate the anatomical lexicon, so they are ignored, not deleted.
+# Revisit with Git LFS if they ever need to be versioned or mirrored.
+assets-src/
 *.blend
 *.blend1
 *.zip

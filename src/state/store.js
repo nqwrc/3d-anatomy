@@ -86,10 +86,25 @@ export function setSelectedPart(part) {
   notify('selectedPart', part);
 }
 
+let partStateBatchDepth = 0;
+
 export function setPartState(partId, updates) {
   const current = state.partStates.get(partId) || { visible: true, opacity: 1, selected: false };
   state.partStates.set(partId, { ...current, ...updates });
-  notify('partStates', state.partStates);
+  if (partStateBatchDepth === 0) notify('partStates', state.partStates);
+}
+
+// Bulk operations (isolate, show all, per-system toggles) touch every structure.
+// Subscribers walk the whole map, so notifying once per structure turns a single
+// click into thousands of DOM queries.
+export function batchPartStates(fn) {
+  partStateBatchDepth++;
+  try {
+    fn();
+  } finally {
+    partStateBatchDepth--;
+    if (partStateBatchDepth === 0) notify('partStates', state.partStates);
+  }
 }
 
 export function setPartStates(partStates) {
@@ -174,9 +189,9 @@ export function getPartState(partId) {
 }
 
 export function isPartVisible(partId) {
-  const state = getPartState(partId);
+  const partState = getPartState(partId);
   if (state.isolatedPart && state.isolatedPart !== partId) return false;
-  return state.visible && !state.hiddenParts.has(partId);
+  return partState.visible && !state.hiddenParts.has(partId);
 }
 
 export function getStructureInfo(partId) {

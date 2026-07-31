@@ -1,6 +1,7 @@
 // Camera Controls - Predefined views, animations, and camera management
 import * as THREE from 'three';
-import { state, setAnimating, setCurrentView, getViewer, notify } from '../state/store.js';
+import { state, setAnimating, setCurrentView, notify } from '../state/store.js';
+import { restoreAllParts } from './visibility.js';
 
 const VIEWS = {
   front: { position: new THREE.Vector3(0, 0, 1), target: new THREE.Vector3(0, 0, 0) },
@@ -23,9 +24,10 @@ export function setView(viewName, viewer, animate = true) {
 
   if (!model) return Promise.resolve();
 
+  // Frame the model where it actually is; it is not centred on the origin.
   const distance = model.maxDim * 1.5;
-  const targetPos = view.position.clone().multiplyScalar(distance);
-  const targetTarget = view.target.clone();
+  const targetTarget = model.center.clone();
+  const targetPos = view.position.clone().multiplyScalar(distance).add(targetTarget);
 
   if (animate) {
     return animateCamera(camera, controls, targetPos, targetTarget);
@@ -115,49 +117,15 @@ export function focusOnMesh(mesh, viewer, animate = true) {
 export function resetView(viewer, animate = true) {
   return setView('front', viewer, animate).then(() => {
     // Show all parts
-    showAllParts(viewer);
+    showAllParts();
     notify('viewReset', true);
   });
 }
 
-export function showAllParts(viewer) {
-  const { scene } = viewer;
-  const { meshRegistry } = await import('./loadModel.js');
-
-  meshRegistry.forEach((mesh, partId) => {
-    mesh.visible = true;
-    restoreMaterial(mesh);
-  });
-
-  // Reset state
-  import('../state/store.js').then(({ setHiddenParts, setTransparentParts, setIsolatedPart, notify }) => {
-    setHiddenParts([]);
-    setTransparentParts([]);
-    setIsolatedPart(null);
-  });
-}
-
-export function restoreMaterial(mesh) {
-  if (mesh.userData.originalMaterial && mesh.material) {
-    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    const originals = mesh.userData.originalMaterial;
-
-    materials.forEach((mat, i) => {
-      const orig = originals[i] || originals[0];
-      if (orig) {
-        mat.color.copy(orig.color);
-        mat.opacity = orig.opacity;
-        mat.transparent = orig.transparent;
-        mat.side = orig.side;
-        mat.depthWrite = orig.depthWrite;
-        if (orig.emissive) mat.emissive.copy(orig.emissive);
-        mat.emissiveIntensity = orig.emissiveIntensity;
-        mat.metalness = orig.metalness;
-        mat.roughness = orig.roughness;
-        mat.needsUpdate = true;
-      }
-    });
-  }
+// Material state is owned by viewer/visibility.js; this is kept as a thin alias
+// because the toolbar still calls it.
+export function showAllParts() {
+  restoreAllParts();
 }
 
 export function getCurrentView() {

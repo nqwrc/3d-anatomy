@@ -1,11 +1,19 @@
 // Model Loading - GLB loading, mesh registry, material handling
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { state, setLoadingSystem, notify } from '../state/store.js';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
+import { state, setLoadingSystem } from '../state/store.js';
+import { asset } from '../utils/paths.js';
 
-let meshRegistry = new Map(); // Map<partId, mesh>
-let systemRegistry = new Map(); // Map<systemId, mesh[]>
-let currentScene = null;
+// The Z-Anatomy models are exported with Draco compression, so the decoder
+// (copied into public/draco) is required to read them.
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath(asset('draco/'));
+
+let meshRegistry = new Map(); // Map<partId, node>
+let structures = new Map(); // Map<partId, { node, systemId, parentId, childIds, ownMeshes }>
+let systemRegistry = new Map(); // Map<systemId, node[]>
+let modelRoots = new Map(); // Map<systemId, gltf.scene>
 let loadingManager = new THREE.LoadingManager();
 
 export function getMeshRegistry() {
@@ -16,19 +24,50 @@ export function getSystemRegistry() {
   return systemRegistry;
 }
 
+export function getStructure(partId) {
+  return structures.get(partId);
+}
+
+// Roots of the loaded models. Raycasting against these instead of against the
+// registry avoids re-testing shared subtrees once per nested structure.
+export function getPickTargets() {
+  return Array.from(modelRoots.values());
+}
+
+// The meshes a structure owns directly, i.e. excluding those belonging to a
+// nested structure. 868 of the 2829 structures are descendants of another one,
+// so "every mesh under this node" is not the same thing as "this structure".
+export function ownMeshesOf(partId) {
+  const entry = structures.get(partId);
+  return entry ? entry.ownMeshes : [];
+}
+
+// A structure plus everything nested inside it, in document order.
+export function withDescendants(partId) {
+  const out = [];
+  const walk = id => {
+    const entry = structures.get(id);
+    if (!entry) return;
+    out.push(id);
+    entry.childIds.forEach(walk);
+  };
+  walk(partId);
+  return out;
+}
+
 export function getLoadedSystems() {
   return state.loadedSystems;
 }
 
 export async function loadModel(systemId, viewer, options = {}) {
-  const { scene, camera, renderer } = viewer;
-  currentScene = scene;
+  const { scene } = viewer;
 
   console.log(`[loadModel] Starting load of ${systemId}.glb`);
   
   return new Promise((resolve, reject) => {
     const loader = new GLTFLoader(loadingManager);
-    const modelPath = `/models/${systemId}.glb`;
+    loader.setDRACOLoader(dracoLoader);
+    const modelPath = asset(`models/${systemId}.glb`);
 
     setLoadingSystem(systemId, false, 0);
 
@@ -39,6 +78,7 @@ export async function loadModel(systemId, viewer, options = {}) {
         const model = gltf.scene;
         processModel(model, systemId, viewer);
         scene.add(model);
+        modelRoots.set(systemId, model);
 
         state.loadedSystems.push(systemId);
         setLoadingSystem(systemId, true, 100);
@@ -61,33 +101,83 @@ export async function loadModel(systemId, viewer, options = {}) {
 }
 
 function processModel(model, systemId, viewer) {
-  const meshes = [];
+  const nodes = [];
 
+  // The glTF carries the untouched Z-Anatomy name in `za_name`, because the
+  // exporter rewrites object names (spaces, dots) and paired structures would
+  // otherwise collapse onto the same name.
   model.traverse((child) => {
-    if (child.isMesh) {
-      setupMesh(child, systemId, viewer);
-      meshes.push(child);
+    const partId = child.userData?.za_name;
+    if (!partId) return;
 
-      // Register by part ID (from mesh name)
-      const partId = child.name || child.userData.name || `unknown_${meshes.length}`;
-      child.userData.partId = partId;
-      child.userData.system = systemId;
-      child.userData.originalName = child.name;
+    child.userData.partId = partId;
+    child.userData.system = systemId;
+    child.userData.originalName = partId;
 
-      meshRegistry.set(partId, child);
+    // The glTF graph is nested: a structure can be the parent of another one.
+    // Record that relation instead of flattening it, because three.js applies
+    // `visible` down the whole subtree and hiding a parent would take its
+    // children with it.
+    const parentId = findAncestorPartId(child.parent);
+
+    nodes.push(child);
+    meshRegistry.set(partId, child);
+    structures.set(partId, {
+      node: child,
+      systemId,
+      parentId,
+      childIds: [],
+      ownMeshes: []
+    });
+
+    if (parentId) {
+      const parent = structures.get(parentId);
+      if (parent) parent.childIds.push(partId);
     }
   });
 
-  systemRegistry.set(systemId, meshes);
-  console.log(`Loaded ${systemId}: ${meshes.length} meshes`);
+  // A nested structure is often a child of a node that is itself a mesh, so
+  // hiding the parent would hide the child with it. Detach every nested
+  // structure to the model root (attach preserves the world transform): the
+  // anatomical nesting stays recorded above, but visibility becomes
+  // independent per structure.
+  model.updateMatrixWorld(true);
+  nodes.forEach(node => {
+    if (structures.get(node.userData.partId).parentId) {
+      model.attach(node);
+    }
+  });
 
-  // Log mesh names for debugging
-  if (meshes.length > 0) {
-    console.log(`${systemId} meshes:`, meshes.map(m => m.name).filter(n => n));
+  // Assign every mesh to the closest structure above it, so a parent structure
+  // never claims the geometry of a nested one.
+  model.traverse((child) => {
+    if (!child.isMesh) return;
+
+    setupMesh(child, systemId, viewer);
+
+    const ownerId = findAncestorPartId(child);
+    const owner = ownerId && structures.get(ownerId);
+    if (owner) owner.ownMeshes.push(child);
+  });
+
+  systemRegistry.set(systemId, nodes);
+  console.log(`Loaded ${systemId}: ${nodes.length} structures`);
+}
+
+// Walks up from `node` (inclusive) to the closest node carrying a partId.
+function findAncestorPartId(node) {
+  let current = node;
+  while (current) {
+    if (current.userData?.partId) return current.userData.partId;
+    current = current.parent;
   }
+  return null;
 }
 
 function setupMesh(mesh, systemId, viewer) {
+  // Idempotent: a mesh must not have its material snapshot taken twice.
+  if (mesh.userData.originalMaterial) return;
+
   // Clone material to avoid shared material issues
   if (mesh.material) {
     const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
@@ -212,119 +302,24 @@ function centerCamera(viewer) {
   camera.userData.initialZoom = controls.zoom;
 }
 
-export function getMeshByPartId(partId) {
-  return meshRegistry.get(partId);
-}
-
 export function getMeshesBySystem(systemId) {
   return systemRegistry.get(systemId) || [];
 }
 
+// Walks the structures rather than the nodes, so meshes shared with a nested
+// structure are not counted twice.
 export function getAllMeshes() {
-  return Array.from(meshRegistry.values());
+  return Array.from(structures.values()).flatMap(entry => entry.ownMeshes);
 }
 
-export function getPartIdByMeshName(meshName) {
-  for (const [partId, mesh] of meshRegistry) {
-    if (mesh.name === meshName || mesh.userData.originalName === meshName) {
-      return partId;
-    }
-  }
-  return null;
-}
-
-// Material manipulation helpers
-export function setMeshVisibility(partId, visible) {
-  const mesh = meshRegistry.get(partId);
-  if (mesh) {
-    mesh.visible = visible;
-    setPartState(partId, { visible });
-  }
-}
-
-export function setMeshOpacity(partId, opacity) {
-  const mesh = meshRegistry.get(partId);
-  if (mesh && mesh.material) {
-    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    materials.forEach(mat => {
-      mat.opacity = opacity;
-      mat.transparent = opacity < 1;
-      mat.needsUpdate = true;
-    });
-    setPartState(partId, { opacity });
-  }
-}
-
-export function isolatePart(partId) {
-  // Hide all other parts
-  meshRegistry.forEach((mesh, id) => {
-    if (id !== partId) {
-      mesh.visible = false;
-      setPartState(id, { visible: false });
-    } else {
-      mesh.visible = true;
-      setPartState(id, { visible: true });
-    }
-  });
-}
-
-export function showAllParts() {
-  meshRegistry.forEach((mesh, partId) => {
-    mesh.visible = true;
-    setPartState(partId, { visible: true, opacity: 1 });
-    restoreMeshMaterial(mesh);
-  });
-}
-
-export function restoreMeshMaterial(mesh) {
-  if (mesh.userData.originalMaterial && mesh.material) {
-    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    materials.forEach((mat, i) => {
-      const orig = mesh.userData.originalMaterial[i] || mesh.userData.originalMaterial[0];
-      if (orig) {
-        mat.color.copy(orig.color);
-        mat.opacity = orig.opacity;
-        mat.transparent = orig.transparent;
-        mat.side = orig.side;
-        mat.depthWrite = orig.depthWrite;
-        if (orig.emissive) mat.emissive.copy(orig.emissive);
-        mat.emissiveIntensity = orig.emissiveIntensity;
-        mat.metalness = orig.metalness;
-        mat.roughness = orig.roughness;
-        mat.needsUpdate = true;
-      }
-    });
-  }
-}
-
-export function highlightMesh(partId, color = 0xffdf5d, intensity = 0.5) {
-  const mesh = meshRegistry.get(partId);
-  if (mesh && mesh.material) {
-    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    materials.forEach(mat => {
-      mat.emissive = new THREE.Color(color);
-      mat.emissiveIntensity = intensity;
-      mat.needsUpdate = true;
-    });
-  }
-}
-
-export function clearHighlight(partId) {
-  const mesh = meshRegistry.get(partId);
-  if (mesh) {
-    restoreMeshMaterial(mesh);
-  }
-}
-
-export function clearAllHighlights() {
-  meshRegistry.forEach(mesh => restoreMeshMaterial(mesh));
-}
+// Visibility, transparency and highlighting all live in viewer/visibility.js,
+// which is the single owner of material state.
 
 export function getModelStats() {
   let totalMeshes = 0;
   let totalTriangles = 0;
 
-  meshRegistry.forEach(mesh => {
+  getAllMeshes().forEach(mesh => {
     totalMeshes++;
     if (mesh.geometry && mesh.geometry.index) {
       totalTriangles += mesh.geometry.index.count / 3;
@@ -338,7 +333,7 @@ export function getModelStats() {
 
 // Cleanup
 export function dispose() {
-  meshRegistry.forEach(mesh => {
+  getAllMeshes().forEach(mesh => {
     if (mesh.geometry) mesh.geometry.dispose();
     if (mesh.material) {
       const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
@@ -346,6 +341,8 @@ export function dispose() {
     }
   });
   meshRegistry.clear();
+  structures.clear();
   systemRegistry.clear();
+  modelRoots.clear();
   state.loadedSystems = [];
 }

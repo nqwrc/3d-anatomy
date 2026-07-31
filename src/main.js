@@ -1,19 +1,12 @@
-import './style.css';
 import { createScene } from './viewer/createScene.js';
 import { loadSystems } from './viewer/loadModel.js';
 import { initSelection } from './viewer/selection.js';
 import { initUI } from './ui/sidebar.js';
-import { setViewer, setPartsData, setSystemsData, setRegionsData, setTranslations, setSearchIndex } from './state/store.js';
-import { samplePartsData } from './data/sampleParts.js';
-import { sampleSystemsData } from './data/sampleSystems.js';
-import { sampleRegionsData } from './data/sampleRegions.js';
+import { setViewer, setPartsData, setSystemsData, setTranslations, setSearchIndex } from './state/store.js';
+import { loadSystemsData, buildPartsData, DEFAULT_SYSTEM } from './data/anatomy.js';
 import { translationsIt, translationsEn } from './data/translations.js';
 
-setPartsData(samplePartsData);
-setSystemsData(sampleSystemsData);
-setRegionsData(sampleRegionsData);
 setTranslations({ it: translationsIt, en: translationsEn });
-setSearchIndex(buildSearchIndex(samplePartsData));
 
 function buildSearchIndex(parts) {
   const index = [];
@@ -21,7 +14,7 @@ function buildSearchIndex(parts) {
     const terms = [partId.toLowerCase()];
     if (info.name?.it) terms.push(info.name.it.toLowerCase());
     if (info.name?.en) terms.push(info.name.en.toLowerCase());
-    if (info.latinName) terms.push(info.latinName.toLowerCase());
+    if (info.baseName) terms.push(info.baseName.toLowerCase());
     index.push({ partId, name: info.name?.it || info.name?.en || partId, system: info.system || 'unknown', terms: [...new Set(terms)] });
   });
   return index;
@@ -46,10 +39,18 @@ async function init() {
   const loadingOverlay = document.getElementById('loadingOverlay');
 
   try {
+    const systemsData = await loadSystemsData();
+    setSystemsData(systemsData);
+
+    const partsData = buildPartsData(systemsData);
+    setPartsData(partsData);
+    setSearchIndex(buildSearchIndex(partsData));
+    console.log(`[main] Anatomy data ready: ${Object.keys(partsData).length} structures`);
+
     if (viewer) {
-      console.log('[main] Loading muscular system...');
-      await loadSystems(['muscular'], viewer);
-      console.log('[main] Muscular system loaded');
+      console.log(`[main] Loading ${DEFAULT_SYSTEM} system...`);
+      await loadSystems([DEFAULT_SYSTEM], viewer);
+      console.log(`[main] ${DEFAULT_SYSTEM} system loaded`);
     }
   } catch (error) {
     console.error('[main] Initialization error:', error);

@@ -1,35 +1,15 @@
 // Data loading from JSON files
-import { state, setPartsData, setSystemsData, setRegionsData, setTranslations, setSearchIndex, notify } from '../state/store.js';
+import { state, setTranslations, setSearchIndex, notify } from '../state/store.js';
+import { asset } from './paths.js';
 
+// Parts and systems are set up in main.js from systems.json (see data/anatomy.js);
+// this only loads the UI translations and refreshes the search index.
 export async function loadAllData() {
   try {
-    // Load parts data
-    const partsResponse = await fetch('/data/parts.json');
-    if (partsResponse.ok) {
-      const partsData = await partsResponse.json();
-      setPartsData(partsData);
-    } else {
-      console.warn('Could not load parts.json');
-    }
-
-    // Load systems data
-    const systemsResponse = await fetch('/data/systems.json');
-    if (systemsResponse.ok) {
-      const systemsData = await systemsResponse.json();
-      setSystemsData(systemsData);
-    }
-
-    // Load regions data
-    const regionsResponse = await fetch('/data/regions.json');
-    if (regionsResponse.ok) {
-      const regionsData = await regionsResponse.json();
-      setRegionsData(regionsData);
-    }
-
     // Load translations
     const [itResponse, enResponse] = await Promise.all([
-      fetch('/data/translations/it.json'),
-      fetch('/data/translations/en.json')
+      fetch(asset('data/translations/it.json')),
+      fetch(asset('data/translations/en.json'))
     ]);
 
     if (itResponse.ok && enResponse.ok) {

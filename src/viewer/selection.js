@@ -1,16 +1,37 @@
 // Selection - Raycasting, highlighting, and selection management
 import * as THREE from 'three';
-import { state, setSelectedPart, notify, getStructureInfo } from '../state/store.js';
-import { getMeshRegistry, highlightMesh, clearHighlight, clearAllHighlights } from './loadModel.js';
-import { setView, focusOnMesh } from './camera.js';
+import { state, setSelectedPart, getStructureInfo } from '../state/store.js';
+import { getMeshRegistry, getPickTargets } from './loadModel.js';
+import { highlightMesh, clearHighlight } from './visibility.js';
+import { focusOnMesh } from './camera.js';
+
+// Distinguishes a tap from the end of an orbit gesture.
+const TAP_MAX_MOVE_PX = 10;
+const TAP_MAX_DURATION_MS = 300;
 
 let raycaster = new THREE.Raycaster();
 let mouse = new THREE.Vector2();
 let lastSelectedMesh = null;
 let lastIntersectedMesh = null;
+let touchStart = null;
+
+// Raycasting against the model roots tests each subtree once; the registry
+// holds nested structures, so it would test shared geometry repeatedly.
+function pickAt(event, viewer) {
+  getEventPosition(event, viewer.canvas);
+  raycaster.setFromCamera(mouse, viewer.camera);
+
+  const intersects = raycaster.intersectObjects(getPickTargets(), true);
+  for (const hit of intersects) {
+    if (!hit.object.visible) continue;
+    const structure = findParentMesh(hit.object);
+    if (structure) return structure;
+  }
+  return null;
+}
 
 export function initSelection(viewer) {
-  const { canvas, camera, scene } = viewer;
+  const { canvas } = viewer;
 
   // Mouse events
   canvas.addEventListener('click', onClick);
@@ -43,18 +64,9 @@ function onClick(event) {
   const viewer = state.viewer;
   if (!viewer) return;
 
-  getEventPosition(event, viewer.canvas);
-  raycaster.setFromCamera(mouse, viewer.camera);
-
-  // Only intersect visible meshes
-  const meshes = Array.from(getMeshRegistry().values()).filter(m => m.visible);
-  const intersects = raycaster.intersectObjects(meshes, true);
-
-  if (intersects.length > 0) {
-    const intersected = findParentMesh(intersects[0].object);
-    if (intersected && intersected.userData.partId) {
-      selectPart(intersected.userData.partId, viewer);
-    }
+  const structure = pickAt(event, viewer);
+  if (structure) {
+    selectPart(structure.userData.partId, viewer);
   } else {
     // Clicked on background - deselect
     deselectPart();
@@ -65,42 +77,35 @@ function onDoubleClick(event) {
   const viewer = state.viewer;
   if (!viewer) return;
 
-  getEventPosition(event, viewer.canvas);
-  raycaster.setFromCamera(mouse, viewer.camera);
-
-  const meshes = Array.from(getMeshRegistry().values()).filter(m => m.visible);
-  const intersects = raycaster.intersectObjects(meshes, true);
-
-  if (intersects.length > 0) {
-    const intersected = findParentMesh(intersects[0].object);
-    if (intersected && intersected.userData.partId) {
-      focusOnMesh(intersected, viewer, true);
-    }
+  const structure = pickAt(event, viewer);
+  if (structure) {
+    focusOnMesh(structure, viewer, true);
   }
 }
 
 function onPointerMove(event) {
+  // Touch drives selection through the tap handler; hovering with a finger is
+  // not a gesture, and picking on every move of an orbit is wasted work.
+  if (event.pointerType && event.pointerType !== 'mouse') return;
+
   const viewer = state.viewer;
   if (!viewer) return;
 
-  getEventPosition(event, viewer.canvas);
-  raycaster.setFromCamera(mouse, viewer.camera);
+  const structure = pickAt(event, viewer);
 
-  const meshes = Array.from(getMeshRegistry().values()).filter(m => m.visible);
-  const intersects = raycaster.intersectObjects(meshes, true);
+  if (structure === lastIntersectedMesh) return;
 
   // Clear previous hover
   if (lastIntersectedMesh && lastIntersectedMesh !== lastSelectedMesh) {
     clearHighlight(lastIntersectedMesh.userData.partId);
   }
 
-  if (intersects.length > 0) {
-    const intersected = findParentMesh(intersects[0].object);
-    if (intersected && intersected.userData.partId && intersected !== lastSelectedMesh) {
-      highlightMesh(intersected.userData.partId, 0xffdf5d, 0.3);
-      lastIntersectedMesh = intersected;
-      viewer.canvas.style.cursor = 'pointer';
+  if (structure) {
+    if (structure !== lastSelectedMesh) {
+      highlightMesh(structure.userData.partId, 0xffdf5d, 0.3);
     }
+    lastIntersectedMesh = structure;
+    viewer.canvas.style.cursor = 'pointer';
   } else {
     lastIntersectedMesh = null;
     viewer.canvas.style.cursor = 'grab';
@@ -108,32 +113,51 @@ function onPointerMove(event) {
 }
 
 function onTouchStart(event) {
-  // Prevent default to avoid scrolling while interacting with model
-  if (event.touches.length === 1) {
-    event.preventDefault();
+  if (event.touches.length !== 1) {
+    // Pinch or two-finger pan belongs to OrbitControls.
+    touchStart = null;
+    return;
   }
+
+  const touch = event.touches[0];
+  touchStart = { x: touch.clientX, y: touch.clientY, time: event.timeStamp };
 }
 
 function onTouchEnd(event) {
-  if (event.changedTouches.length === 1) {
-    // Treat as click
-    const clickEvent = new MouseEvent('click', {
-      clientX: event.changedTouches[0].clientX,
-      clientY: event.changedTouches[0].clientY
-    });
-    viewer.canvas.dispatchEvent(clickEvent);
+  const start = touchStart;
+  touchStart = null;
+
+  if (!start || event.changedTouches.length !== 1) return;
+
+  const touch = event.changedTouches[0];
+  const moved = Math.hypot(touch.clientX - start.x, touch.clientY - start.y);
+  const elapsed = event.timeStamp - start.time;
+
+  // Only a short, stationary touch is a selection; anything else was an orbit.
+  if (moved > TAP_MAX_MOVE_PX || elapsed > TAP_MAX_DURATION_MS) return;
+
+  const viewer = state.viewer;
+  if (!viewer) return;
+
+  const structure = pickAt({ clientX: touch.clientX, clientY: touch.clientY }, viewer);
+  if (structure) {
+    selectPart(structure.userData.partId, viewer);
+  } else {
+    deselectPart();
   }
 }
 
+// A structure exported with several materials becomes a group of meshes, so the
+// raycast hit may be a child; the partId lives on the node above it.
 function findParentMesh(object) {
   let current = object;
-  while (current && current.parent) {
-    if (current.isMesh && current.userData.partId) {
+  while (current) {
+    if (current.userData?.partId) {
       return current;
     }
     current = current.parent;
   }
-  return object.isMesh && object.userData.partId ? object : null;
+  return null;
 }
 
 export function selectPart(partId, viewer) {
@@ -198,7 +222,6 @@ export function deselectPart() {
 }
 
 function showInfoPanel(partData) {
-  const content = document.getElementById('infoContent');
   const placeholder = document.querySelector('.info-placeholder');
   const structureInfo = document.getElementById('structureInfo');
 
@@ -212,8 +235,6 @@ function showInfoPanel(partData) {
   const latinName = info.latinName || '';
   const system = info.system || partData.system;
   const systemLabel = getSystemLabel(system, lang);
-  const region = info.region || partData.region;
-  const regionLabel = getRegionLabel(region, lang);
   const description = info.description?.[lang] || info.description?.en || '';
   const functions = info.functions || [];
   const origin = info.origin || '';
@@ -328,28 +349,6 @@ function getSystemLabel(system, lang) {
     }
   };
   return labels[lang]?.[system] || system;
-}
-
-function getRegionLabel(region, lang) {
-  const labels = {
-    it: {
-      head: 'Capo',
-      neck: 'Collo',
-      thorax: 'Torace',
-      abdomen: 'Addome',
-      upper_limb: 'Arto superiore',
-      lower_limb: 'Arto inferiore'
-    },
-    en: {
-      head: 'Head',
-      neck: 'Neck',
-      thorax: 'Thorax',
-      abdomen: 'Abdomen',
-      upper_limb: 'Upper limb',
-      lower_limb: 'Lower limb'
-    }
-  };
-  return labels[lang]?.[region] || region;
 }
 
 function translate(key, lang) {

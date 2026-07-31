@@ -1,7 +1,8 @@
 // Sidebar UI - Systems panel with collapsible groups
-import { state, subscribe, getSystemParts, translate } from '../state/store.js';
-import { getMeshRegistry, getMeshesBySystem } from '../viewer/loadModel.js';
-import { hideSystem, showSystem, setSystemTransparency, getSystemVisibilityState } from '../viewer/visibility.js';
+import { state, subscribe, getSystemParts, getStructureInfo, setLanguage, translate } from '../state/store.js';
+import { getMeshRegistry, loadModel } from '../viewer/loadModel.js';
+import { SYSTEM_IDS } from '../data/anatomy.js';
+import { hideSystem, showSystem, hidePart, showPart, isolatePart, setPartTransparency, getSystemVisibilityState } from '../viewer/visibility.js';
 import { selectPartById, deselectPart } from '../viewer/selection.js';
 import { setView, resetView } from '../viewer/camera.js';
 import { loadAllData, searchStructures } from '../utils/dataLoader.js';
@@ -10,47 +11,39 @@ export function initSystemsSidebar() {
   const container = document.getElementById('systemsList');
   if (!container) return;
 
-  // System order and labels
-  const systemOrder = [
-    'muscular', 'skeletal', 'cardiovascular', 'respiratory',
-    'digestive', 'urinary', 'nervous', 'joints', 'lymphatic'
-  ];
+  // Systems as they are organised in the Z-Anatomy source file. Respiratory,
+  // digestive and urinary structures all live in the single "visceral" model.
+  const systemOrder = SYSTEM_IDS;
 
   const systemLabels = {
     it: {
-      muscular: 'Sistema muscolare',
       skeletal: 'Sistema scheletrico',
-      cardiovascular: 'Sistema cardiovascolare',
-      respiratory: 'Sistema respiratorio',
-      digestive: 'Sistema digerente',
-      urinary: 'Sistema urinario',
-      nervous: 'Sistema nervoso',
+      muscular: 'Sistema muscolare',
       joints: 'Articolazioni',
-      lymphatic: 'Organi linfatici'
+      cardiovascular: 'Sistema cardiovascolare',
+      lymphatic: 'Organi linfatici',
+      nervous: 'Sistema nervoso e organi di senso',
+      visceral: 'Sistemi viscerali'
     },
     en: {
-      muscular: 'Muscular system',
       skeletal: 'Skeletal system',
-      cardiovascular: 'Cardiovascular system',
-      respiratory: 'Respiratory system',
-      digestive: 'Digestive system',
-      urinary: 'Urinary system',
-      nervous: 'Nervous system',
+      muscular: 'Muscular system',
       joints: 'Joints',
-      lymphatic: 'Lymphatic organs'
+      cardiovascular: 'Cardiovascular system',
+      lymphatic: 'Lymphoid organs',
+      nervous: 'Nervous system & sense organs',
+      visceral: 'Visceral systems'
     }
   };
 
   const systemIcons = {
-    muscular: '💪',
     skeletal: '🦴',
-    cardiovascular: '❤️',
-    respiratory: '🫁',
-    digestive: '🫃',
-    urinary: '🫘',
-    nervous: '🧠',
+    muscular: '💪',
     joints: '🦵',
-    lymphatic: '🫧'
+    cardiovascular: '❤️',
+    lymphatic: '🫧',
+    nervous: '🧠',
+    visceral: '🫁'
   };
 
   const lang = state.language || 'it';
@@ -81,47 +74,61 @@ export function initSystemsSidebar() {
 
   // Add event listeners for system toggles
   container.querySelectorAll('[data-system-checkbox]').forEach(checkbox => {
-    checkbox.addEventListener('change', (e) => {
+    checkbox.addEventListener('change', async (e) => {
       const systemId = e.target.dataset.systemCheckbox;
-      const content = e.target.closest('.system-group').querySelector('.system-group-content');
+      const group = e.target.closest('.system-group');
+      const content = group.querySelector('.system-group-content');
 
-      if (e.target.checked) {
-        showSystem(systemId);
-        content.style.display = 'block';
-      } else {
+      if (!e.target.checked) {
         hideSystem(systemId);
         content.style.display = 'none';
+        return;
       }
-    });
-  });
 
-  // Add click handlers for system labels to expand/collapse structure list
-  container.querySelectorAll('.system-group-label').forEach(label => {
-    label.addEventListener('click', (e) => {
-      if (e.target.type === 'checkbox') return;
-      const group = label.closest('.system-group');
-      const content = group.querySelector('.system-group-content');
-      const checkbox = group.querySelector('[data-system-checkbox]');
-      const systemId = group.dataset.system;
+      // Models are fetched on first activation, not upfront.
+      await ensureSystemLoaded(systemId, group);
+      showSystem(systemId);
+      content.style.display = 'block';
 
-      checkbox.checked = !checkbox.checked;
-      checkbox.dispatchEvent(new Event('change'));
-
-      if (checkbox.checked && content.children.length === 0) {
+      // Building the list here covers every activation path: clicking the
+      // checkbox, clicking the row, or keyboard activation.
+      if (content.children.length === 0) {
         populateSystemStructures(systemId, content);
       }
     });
   });
 }
 
+const pendingSystemLoads = new Map();
+
+async function ensureSystemLoaded(systemId, group) {
+  if (state.loadedSystems.includes(systemId)) return;
+
+  if (!pendingSystemLoads.has(systemId)) {
+    const label = group?.querySelector('.system-group-label');
+    label?.classList.add('loading');
+
+    const promise = loadModel(systemId, state.viewer)
+      .catch(error => {
+        console.error(`[sidebar] Failed to load ${systemId}:`, error);
+      })
+      .finally(() => {
+        label?.classList.remove('loading');
+        pendingSystemLoads.delete(systemId);
+      });
+
+    pendingSystemLoads.set(systemId, promise);
+  }
+
+  await pendingSystemLoads.get(systemId);
+}
+
 function populateSystemStructures(systemId, container) {
   const parts = getSystemParts(systemId);
   const lang = state.language || 'it';
-  const meshRegistry = getMeshRegistry();
 
   container.innerHTML = parts.map(partId => {
-    const mesh = meshRegistry.get(partId);
-    const info = mesh?.userData?.info || {};
+    const info = getStructureInfo(partId) || {};
 
     const name = info.name?.[lang] || info.name?.en || partId;
     const partState = state.partStates.get(partId);
@@ -152,9 +159,9 @@ function populateSystemStructures(systemId, container) {
     checkbox.addEventListener('change', (e) => {
       const partId = e.target.dataset.partCheckbox;
       if (e.target.checked) {
-        showSystem(partId.split('_')[0]);
+        showPart(partId);
       } else {
-        hideSystem(partId.split('_')[0]);
+        hidePart(partId);
       }
     });
   });
@@ -171,9 +178,7 @@ function populateSystemStructures(systemId, container) {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const partId = e.currentTarget.dataset.part;
-      import('../viewer/visibility.js').then(({ isolatePart }) => {
-        isolatePart(partId);
-      });
+      isolatePart(partId);
     });
   });
 
@@ -181,10 +186,8 @@ function populateSystemStructures(systemId, container) {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const partId = e.currentTarget.dataset.part;
-      import('../viewer/visibility.js').then(({ hidePart }) => {
-        hidePart(partId);
-        deselectPart();
-      });
+      hidePart(partId);
+      deselectPart();
     });
   });
 
@@ -193,9 +196,7 @@ function populateSystemStructures(systemId, container) {
       e.stopPropagation();
       const partId = e.currentTarget.dataset.part;
       const visibility = getPartVisibility(partId);
-      import('../viewer/visibility.js').then(({ setPartTransparency }) => {
-        setPartTransparency(partId, visibility.opacity < 1 ? 1 : 0.3);
-      });
+      setPartTransparency(partId, visibility.opacity < 1 ? 1 : 0.3);
     });
   });
 }
@@ -239,27 +240,21 @@ export function initToolbar(viewer) {
 
 function isolateSelected() {
   if (state.selectedPart) {
-    import('../viewer/visibility.js').then(({ isolatePart }) => {
-      isolatePart(state.selectedPart.id);
-    });
+    isolatePart(state.selectedPart.id);
   }
 }
 
 function hideSelected() {
   if (state.selectedPart) {
-    import('../viewer/visibility.js').then(({ hidePart }) => {
-      hidePart(state.selectedPart.id);
-      deselectPart();
-    });
+    hidePart(state.selectedPart.id);
+    deselectPart();
   }
 }
 
 function toggleTransparencySelected() {
   if (state.selectedPart) {
     const visibility = getPartVisibility(state.selectedPart.id);
-    import('../viewer/visibility.js').then(({ setPartTransparency }) => {
-      setPartTransparency(state.selectedPart.id, visibility.opacity < 1 ? 1 : 0.3);
-    });
+    setPartTransparency(state.selectedPart.id, visibility.opacity < 1 ? 1 : 0.3);
   }
 }
 
@@ -303,9 +298,7 @@ export function initLanguageSelector() {
   if (select) {
     select.value = state.language || 'it';
     select.addEventListener('change', (e) => {
-      import('../state/store.js').then(({ setLanguage }) => {
-        setLanguage(e.target.value);
-      });
+      setLanguage(e.target.value);
     });
   }
 }
@@ -497,4 +490,27 @@ export async function initUI(viewer) {
   initHelpModal();
   initLanguageSelector();
   initSearch();
+  initDrawers();
+}
+
+// On narrow layouts both sidebars slide off-canvas; these wire the header
+// buttons that bring them back and the close buttons inside them.
+function initDrawers() {
+  const drawers = [
+    { sidebar: 'systemsSidebar', open: 'systemsOpen', close: 'systemsToggle' },
+    { sidebar: 'infoSidebar', open: 'infoOpen', close: 'infoToggle' }
+  ];
+
+  drawers.forEach(({ sidebar, open, close }) => {
+    const panel = document.getElementById(sidebar);
+    if (!panel) return;
+
+    document.getElementById(open)?.addEventListener('click', () => {
+      panel.classList.add('open');
+    });
+
+    document.getElementById(close)?.addEventListener('click', () => {
+      panel.classList.remove('open');
+    });
+  });
 }

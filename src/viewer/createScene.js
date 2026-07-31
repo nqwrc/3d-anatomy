@@ -32,13 +32,15 @@ export function createScene() {
   renderer.shadowMap.enabled = false; // Disabled for performance
 
   // Camera
+  // The Z-Anatomy models are built to real scale: a body is roughly 1.7 units
+  // (metres) tall, so near/far and the camera distance are in the same order.
   const camera = new THREE.PerspectiveCamera(
     50, // FOV
     canvas.clientWidth / canvas.clientHeight,
-    0.1, // near
-    1000 // far
+    0.01, // near
+    100 // far
   );
-  camera.position.set(0, 0, 120);
+  camera.position.set(0, 0, 3);
 
   // Controls
   const controls = new OrbitControls(camera, canvas);
@@ -48,8 +50,8 @@ export function createScene() {
   controls.enableZoom = true;
   controls.enableRotate = true;
   controls.autoRotate = false;
-  controls.minDistance = 30;
-  controls.maxDistance = 300;
+  controls.minDistance = 0.02;
+  controls.maxDistance = 20;
   controls.maxPolarAngle = Math.PI * 0.95; // Prevent camera flip
   controls.minPolarAngle = Math.PI * 0.05;
   controls.target.set(0, 0, 0);

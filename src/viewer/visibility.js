@@ -1,55 +1,69 @@
 // Visibility Management - Hide, isolate, transparency, restore
 import * as THREE from 'three';
-import { state, setHiddenParts, setTransparentParts, setIsolatedPart, getPartState, setPartState, notify } from '../state/store.js';
-import { getMeshRegistry, getMeshesBySystem, getSystemRegistry } from './loadModel.js';
+import { state, setHiddenParts, setTransparentParts, setIsolatedPart, getPartState, setPartState, batchPartStates, notify } from '../state/store.js';
+import { getMeshRegistry, getMeshesBySystem, ownMeshesOf, withDescendants } from './loadModel.js';
 
-export function hidePart(partId) {
-  const mesh = getMeshRegistry().get(partId);
-  if (!mesh) return;
-
-  mesh.visible = false;
+// Visibility is applied to the meshes a structure owns, never to its node:
+// three.js propagates `visible` down the subtree, and 868 of the 2829
+// structures sit inside another one, so touching the node would take unrelated
+// structures with it.
+function setStructureVisible(partId, visible) {
+  ownMeshesOf(partId).forEach(mesh => { mesh.visible = visible; });
 
   const partState = getPartState(partId);
-  partState.visible = false;
+  partState.visible = visible;
+  setPartState(partId, { visible });
 
-  setPartState(partId, { visible: false });
+  if (visible) {
+    state.hiddenParts.delete(partId);
+  } else {
+    state.hiddenParts.add(partId);
+  }
+}
+
+export function hidePart(partId) {
+  if (!getMeshRegistry().has(partId)) return;
+
+  // Hiding a structure hides what is nested inside it.
+  batchPartStates(() => {
+    withDescendants(partId).forEach(id => setStructureVisible(id, false));
+  });
+
   notify('partHidden', partId);
 }
 
 export function showPart(partId) {
-  const mesh = getMeshRegistry().get(partId);
-  if (!mesh) return;
+  if (!getMeshRegistry().has(partId)) return;
 
-  mesh.visible = true;
+  batchPartStates(() => {
+    withDescendants(partId).forEach(id => {
+      setStructureVisible(id, true);
+      restoreMaterial(id);
+      setPartState(id, { opacity: 1 });
+      state.transparentParts.delete(id);
+    });
+  });
 
-  // Restore material if it was modified
-  restoreMaterial(mesh);
-
-  const partState = getPartState(partId);
-  partState.visible = true;
-  partState.opacity = 1;
-
-  setPartState(partId, { visible: true, opacity: 1 });
   notify('partShown', partId);
 }
 
 export function setPartTransparency(partId, opacity) {
-  const mesh = getMeshRegistry().get(partId);
-  if (!mesh) return;
+  if (!getMeshRegistry().has(partId)) return;
 
   opacity = THREE.MathUtils.clamp(opacity, 0, 1);
 
-  const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-  materials.forEach(mat => {
-    mat.transparent = opacity < 1;
-    mat.opacity = opacity;
-    mat.depthWrite = opacity >= 1;
-    mat.needsUpdate = true;
+  ownMeshesOf(partId).forEach(mesh => {
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    materials.forEach(mat => {
+      mat.transparent = opacity < 1;
+      mat.opacity = opacity;
+      mat.depthWrite = opacity >= 1;
+      mat.needsUpdate = true;
+    });
   });
 
   const partState = getPartState(partId);
   partState.opacity = opacity;
-
   setPartState(partId, { opacity });
 
   if (opacity < 1) {
@@ -62,19 +76,14 @@ export function setPartTransparency(partId, opacity) {
 }
 
 export function isolatePart(partId) {
-  const meshRegistry = getMeshRegistry();
+  if (!getMeshRegistry().has(partId)) return;
 
-  // Hide all other parts
-  meshRegistry.forEach((mesh, id) => {
-    if (id !== partId) {
-      mesh.visible = false;
-      const state = getPartState(id);
-      state.visible = false;
-    } else {
-      mesh.visible = true;
-      const state = getPartState(id);
-      state.visible = true;
-    }
+  const keep = new Set(withDescendants(partId));
+
+  batchPartStates(() => {
+    getMeshRegistry().forEach((node, id) => {
+      setStructureVisible(id, keep.has(id));
+    });
   });
 
   setIsolatedPart(partId);
@@ -82,16 +91,16 @@ export function isolatePart(partId) {
 }
 
 export function restoreAllParts() {
-  const meshRegistry = getMeshRegistry();
+  batchPartStates(() => {
+    getMeshRegistry().forEach((node, id) => {
+      setStructureVisible(id, true);
+      restoreMaterial(id);
 
-  meshRegistry.forEach((mesh, id) => {
-    mesh.visible = true;
-    restoreMaterial(mesh);
-
-    const state = getPartState(id);
-    state.visible = true;
-    state.opacity = 1;
-    state.selected = false;
+      const partState = getPartState(id);
+      partState.opacity = 1;
+      partState.selected = false;
+      setPartState(id, { opacity: 1, selected: false });
+    });
   });
 
   state.hiddenParts.clear();
@@ -104,70 +113,70 @@ export function restoreAllParts() {
 }
 
 export function hideSystem(systemId) {
-  const meshes = getMeshesBySystem(systemId);
-  meshes.forEach(mesh => {
-    mesh.visible = false;
-    const partId = mesh.userData.partId;
-    if (partId) {
-      const state = getPartState(partId);
-      state.visible = false;
-      state.hiddenParts.add(partId);
-    }
+  batchPartStates(() => {
+    getMeshesBySystem(systemId).forEach(node => {
+      const partId = node.userData.partId;
+      if (partId) setStructureVisible(partId, false);
+    });
   });
 
   notify('systemHidden', systemId);
 }
 
 export function showSystem(systemId) {
-  const meshes = getMeshesBySystem(systemId);
-  meshes.forEach(mesh => {
-    mesh.visible = true;
-    restoreMaterial(mesh);
+  batchPartStates(() => {
+    getMeshesBySystem(systemId).forEach(node => {
+      const partId = node.userData.partId;
+      if (!partId) return;
 
-    const partId = mesh.userData.partId;
-    if (partId) {
-      const state = getPartState(partId);
-      state.visible = true;
-      state.opacity = 1;
-      state.hiddenParts.delete(partId);
-    }
+      setStructureVisible(partId, true);
+      restoreMaterial(partId);
+      setPartState(partId, { opacity: 1 });
+      state.transparentParts.delete(partId);
+    });
   });
 
   notify('systemShown', systemId);
 }
 
 export function setSystemTransparency(systemId, opacity) {
-  const meshes = getMeshesBySystem(systemId);
-  meshes.forEach(mesh => {
-    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    materials.forEach(mat => {
-      mat.transparent = opacity < 1;
-      mat.opacity = opacity;
-      mat.depthWrite = opacity >= 1;
-      mat.needsUpdate = true;
-    });
+  opacity = THREE.MathUtils.clamp(opacity, 0, 1);
 
-    const partId = mesh.userData.partId;
-    if (partId) {
-      const state = getPartState(partId);
-      state.opacity = opacity;
+  batchPartStates(() => {
+    getMeshesBySystem(systemId).forEach(node => {
+      const partId = node.userData.partId;
+      if (!partId) return;
+
+      ownMeshesOf(partId).forEach(mesh => {
+        const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        materials.forEach(mat => {
+          mat.transparent = opacity < 1;
+          mat.opacity = opacity;
+          mat.depthWrite = opacity >= 1;
+          mat.needsUpdate = true;
+        });
+      });
+
+      const partState = getPartState(partId);
+      partState.opacity = opacity;
+      setPartState(partId, { opacity });
+
       if (opacity < 1) {
         state.transparentParts.add(partId);
       } else {
         state.transparentParts.delete(partId);
       }
-    }
+    });
   });
 
   notify('systemTransparencyChanged', { systemId, opacity });
 }
 
 export function toggleSystemVisibility(systemId) {
-  const meshes = getMeshesBySystem(systemId);
-  if (meshes.length === 0) return;
+  const { total, visible } = getSystemVisibilityState(systemId);
+  if (total === 0) return;
 
-  const currentlyVisible = meshes.some(m => m.visible);
-  if (currentlyVisible) {
+  if (visible) {
     hideSystem(systemId);
   } else {
     showSystem(systemId);
@@ -175,99 +184,96 @@ export function toggleSystemVisibility(systemId) {
 }
 
 export function getSystemVisibilityState(systemId) {
-  const meshes = getMeshesBySystem(systemId);
-  if (meshes.length === 0) return { visible: false, total: 0, visibleCount: 0 };
+  const nodes = getMeshesBySystem(systemId);
+  if (nodes.length === 0) return { visible: false, total: 0, visibleCount: 0 };
 
-  const visibleCount = meshes.filter(m => m.visible).length;
+  // Reads the owned meshes, because the node itself is never toggled.
+  const visibleCount = nodes.filter(node => {
+    const partId = node.userData.partId;
+    return partId && ownMeshesOf(partId).some(mesh => mesh.visible);
+  }).length;
+
   return {
     visible: visibleCount > 0,
-    total: meshes.length,
+    total: nodes.length,
     visibleCount
   };
 }
 
-function restoreMaterial(mesh) {
-  if (!mesh.userData.originalMaterial) return;
+function restoreMaterial(partId) {
+  ownMeshesOf(partId).forEach(mesh => {
+    if (!mesh.userData.originalMaterial) return;
 
-  const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-  const originals = mesh.userData.originalMaterial;
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    const originals = mesh.userData.originalMaterial;
 
-  materials.forEach((mat, i) => {
-    const orig = originals[i] || originals[0];
-    if (orig) {
-      mat.color.copy(orig.color);
-      mat.opacity = orig.opacity;
-      mat.transparent = orig.transparent;
-      mat.side = orig.side;
-      mat.depthWrite = orig.depthWrite;
-      if (orig.emissive) mat.emissive.copy(orig.emissive);
-      mat.emissiveIntensity = orig.emissiveIntensity;
-      mat.metalness = orig.metalness;
-      mat.roughness = orig.roughness;
-      mat.needsUpdate = true;
-    }
+    materials.forEach((mat, i) => {
+      const orig = originals[i] || originals[0];
+      if (orig) {
+        mat.color.copy(orig.color);
+        mat.opacity = orig.opacity;
+        mat.transparent = orig.transparent;
+        mat.side = orig.side;
+        mat.depthWrite = orig.depthWrite;
+        if (orig.emissive) mat.emissive.copy(orig.emissive);
+        mat.emissiveIntensity = orig.emissiveIntensity;
+        mat.metalness = orig.metalness;
+        mat.roughness = orig.roughness;
+        mat.needsUpdate = true;
+      }
+    });
   });
 }
 
+// Highlighting only touches `emissive`, so it can be undone without disturbing
+// a transparency the user set.
 export function highlightMesh(partId, color = 0xffdf5d, intensity = 0.5) {
-  const mesh = getMeshRegistry().get(partId);
-  if (!mesh) return;
+  ownMeshesOf(partId).forEach(mesh => {
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
 
-  const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    materials.forEach(mat => {
+      if (!mat.userData.originalEmissive) {
+        mat.userData.originalEmissive = mat.emissive ? mat.emissive.clone() : new THREE.Color(0x000000);
+        mat.userData.originalEmissiveIntensity = mat.emissiveIntensity || 1;
+      }
 
-  materials.forEach(mat => {
-    if (!mat.userData.originalEmissive) {
-      mat.userData.originalEmissive = mat.emissive ? mat.emissive.clone() : new THREE.Color(0x000000);
-      mat.userData.originalEmissiveIntensity = mat.emissiveIntensity || 1;
-    }
-
-    mat.emissive = new THREE.Color(color);
-    mat.emissiveIntensity = intensity;
-    mat.needsUpdate = true;
+      mat.emissive = new THREE.Color(color);
+      mat.emissiveIntensity = intensity;
+      mat.needsUpdate = true;
+    });
   });
-
-  // Subtle scale for outline effect
-  mesh.userData.originalScale = mesh.scale.clone();
-  mesh.scale.multiplyScalar(1.01);
 }
 
 export function clearHighlight(partId) {
-  const mesh = getMeshRegistry().get(partId);
-  if (!mesh) return;
+  ownMeshesOf(partId).forEach(mesh => {
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
 
-  const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-
-  materials.forEach(mat => {
-    if (mat.userData.originalEmissive) {
-      mat.emissive.copy(mat.userData.originalEmissive);
-      mat.emissiveIntensity = mat.userData.originalEmissiveIntensity;
-      mat.needsUpdate = true;
-    }
+    materials.forEach(mat => {
+      if (mat.userData.originalEmissive) {
+        mat.emissive.copy(mat.userData.originalEmissive);
+        mat.emissiveIntensity = mat.userData.originalEmissiveIntensity;
+        mat.needsUpdate = true;
+      }
+    });
   });
+}
 
-  if (mesh.userData.originalScale) {
-    mesh.scale.copy(mesh.userData.originalScale);
-  }
+export function clearAllHighlights() {
+  getMeshRegistry().forEach((node, partId) => clearHighlight(partId));
 }
 
 export function getPartVisibility(partId) {
-  const mesh = getMeshRegistry().get(partId);
-  if (!mesh) return { visible: false, opacity: 0 };
+  if (!getMeshRegistry().has(partId)) return { visible: false, opacity: 0, selected: false };
 
   const partState = getPartState(partId);
   return {
-    visible: mesh.visible && (partState?.visible !== false),
+    visible: ownMeshesOf(partId).some(mesh => mesh.visible),
     opacity: partState?.opacity ?? 1,
     selected: partState?.selected ?? false
   };
 }
 
 export function setPartVisibility(partId, visible) {
-  const mesh = getMeshRegistry().get(partId);
-  if (!mesh) return;
-
-  mesh.visible = visible;
-  const partState = getPartState(partId);
-  partState.visible = visible;
-  setPartState(partId, { visible });
+  if (!getMeshRegistry().has(partId)) return;
+  setStructureVisible(partId, visible);
 }
