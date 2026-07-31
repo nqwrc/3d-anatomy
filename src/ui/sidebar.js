@@ -249,7 +249,7 @@ function rowMarkup(group) {
 
   const sides = ['left', 'right']
     .filter(side => group.sides[side])
-    .map(side => `<button type="button" class="structure-side" data-select="${escapeHtml(group.sides[side])}" title="${side === 'left' ? 'Sinistro' : 'Destro'}">${side === 'left' ? 'S' : 'D'}</button>`)
+    .map(side => `<button type="button" class="structure-side" data-select="${escapeHtml(group.sides[side])}" title="${translate(side === 'left' ? 'side_left' : 'side_right')}">${translate(side === 'left' ? 'side_left_short' : 'side_right_short')}</button>`)
     .join('');
 
   const label = escapeHtml(group.label);
@@ -492,7 +492,7 @@ export function initSearch() {
         // near-identical rows.
         const sides = ['left', 'right']
           .filter(side => row.sides[side])
-          .map(side => `<button type="button" class="result-side" data-part="${escapeHtml(row.sides[side])}">${side === 'left' ? 'S' : 'D'}</button>`)
+          .map(side => `<button type="button" class="result-side" data-part="${escapeHtml(row.sides[side])}" title="${translate(side === 'left' ? 'side_left' : 'side_right')}">${translate(side === 'left' ? 'side_left_short' : 'side_right_short')}</button>`)
           .join('');
 
         const target = row.sides.none || row.sides.right || row.sides.left;
@@ -662,6 +662,18 @@ function updateUIText(lang) {
 
   const infoHeader = document.querySelector('.sidebar-info .sidebar-header h2');
   if (infoHeader) infoHeader.textContent = t('info');
+
+  // Static markup opts in with data-i18n; that is what keeps the help modal
+  // from staying in English after switching language.
+  document.querySelectorAll('[data-i18n]').forEach(element => {
+    element.textContent = t(element.dataset.i18n);
+  });
+
+  const depthLabel = document.querySelector('.depth-label');
+  if (depthLabel) depthLabel.textContent = t('depth');
+
+  const depthSlider = document.getElementById('depthSlider');
+  if (depthSlider) depthSlider.setAttribute('aria-label', t('depth'));
 }
 
 // Initialize all UI
@@ -705,31 +717,47 @@ function initMobileSearch() {
 // On narrow layouts both sidebars slide off-canvas; these wire the header
 // buttons that bring them back and the close buttons inside them.
 function initDrawers() {
-  // On desktop the details panel is a grid column that opens on demand; below
-  // the breakpoint both panels are off-canvas drawers.
   const app = document.getElementById('app');
-  const toggleInfo = (open) => app?.classList.toggle('info-open', open);
+  const drawerQuery = window.matchMedia('(max-width: 1024px)');
 
-  document.getElementById('infoOpen')?.addEventListener('click', () => {
-    toggleInfo(!app.classList.contains('info-open'));
+  const panels = {
+    systems: { el: document.getElementById('systemsSidebar'), closed: '-100%', flag: 'systems-open' },
+    info: { el: document.getElementById('infoSidebar'), closed: '100%', flag: 'info-open' }
+  };
+
+  // The drawer offset is written inline rather than left to a class, because
+  // the off-canvas transform is declared in several places and whichever rule
+  // wins is not worth reasoning about every time the stylesheet moves.
+  function apply(name, open) {
+    const panel = panels[name];
+    if (!panel.el) return;
+
+    app?.classList.toggle(panel.flag, open);
+
+    if (drawerQuery.matches) {
+      panel.el.style.transform = open ? 'translateX(0)' : `translateX(${panel.closed})`;
+    } else {
+      panel.el.style.transform = '';
+    }
+  }
+
+  function isOpen(name) {
+    return app?.classList.contains(panels[name].flag);
+  }
+
+  document.getElementById('systemsOpen')?.addEventListener('click', () => apply('systems', !isOpen('systems')));
+  document.getElementById('systemsToggle')?.addEventListener('click', () => apply('systems', false));
+  document.getElementById('infoOpen')?.addEventListener('click', () => apply('info', !isOpen('info')));
+  document.getElementById('infoToggle')?.addEventListener('click', () => apply('info', false));
+
+  // Crossing the breakpoint must not leave a drawer offset stuck on a panel
+  // that is now part of the desktop layout.
+  drawerQuery.addEventListener('change', () => {
+    apply('systems', isOpen('systems'));
+    apply('info', isOpen('info'));
   });
-  document.getElementById('infoToggle')?.addEventListener('click', () => toggleInfo(false));
 
-  const drawers = [
-    { sidebar: 'systemsSidebar', open: 'systemsOpen', close: 'systemsToggle' },
-    { sidebar: 'infoSidebar', open: 'infoOpen', close: 'infoToggle' }
-  ];
-
-  drawers.forEach(({ sidebar, open, close }) => {
-    const panel = document.getElementById(sidebar);
-    if (!panel) return;
-
-    document.getElementById(open)?.addEventListener('click', () => {
-      panel.classList.add('open');
-    });
-
-    document.getElementById(close)?.addEventListener('click', () => {
-      panel.classList.remove('open');
-    });
-  });
+  // On a phone the systems drawer starts closed; on desktop it is a column.
+  apply('systems', false);
+  apply('info', false);
 }

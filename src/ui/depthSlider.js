@@ -38,7 +38,9 @@ function applyDepth(value) {
       hideSystem(systemId);
     } else {
       showSystem(systemId);
-      if (opacity < 1) setSystemTransparency(systemId, opacity);
+      // Always write the opacity, including 1: sliding back to the top has to
+      // undo the fade, not leave the body permanently see-through.
+      setSystemTransparency(systemId, opacity);
     }
   });
 }

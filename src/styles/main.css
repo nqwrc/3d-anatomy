@@ -1244,11 +1244,10 @@ body {
     border-right: none;
   }
 
-  .sidebar.open {
-    transform: translateX(0);
-  }
-
-  .sidebar.right.open {
+  /* Keyed off the app element so the open state always outweighs the base
+     .sidebar rule, whatever order the drawer rules end up in. */
+  #app.systems-open .sidebar-systems,
+  #app.info-open .sidebar-info {
     transform: translateX(0);
   }
 
@@ -1382,14 +1381,17 @@ body {
   50% { opacity: 0.5; }
 }
 
-/* Reduced motion */
+/* Reduced motion.
+   0s, not the customary 0.01ms: with a near-zero duration the off-canvas
+   panels never reached their end value and could not be opened at all by
+   anyone browsing with reduced motion on. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
+    animation-duration: 0s !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    transition-duration: 0s !important;
   }
 }
 

@@ -83,11 +83,14 @@ export function createScene() {
   // Keyboard orbit, so the viewer is operable without a pointer.
   canvas.addEventListener('keydown', event => {
     const step = event.shiftKey ? 0.25 : 0.08;
+    // Move the camera directly rather than through OrbitControls' internal
+    // deltas: those are consumed during a pointer gesture and update() would
+    // undo the change.
     const handled = {
-      ArrowLeft: () => controls.rotateLeft?.(-step) ?? rotate(-step, 0),
-      ArrowRight: () => controls.rotateLeft?.(step) ?? rotate(step, 0),
-      ArrowUp: () => controls.rotateUp?.(-step) ?? rotate(0, -step),
-      ArrowDown: () => controls.rotateUp?.(step) ?? rotate(0, step),
+      ArrowLeft: () => rotate(-step, 0),
+      ArrowRight: () => rotate(step, 0),
+      ArrowUp: () => rotate(0, -step),
+      ArrowDown: () => rotate(0, step),
       '+': () => dolly(0.9),
       '=': () => dolly(0.9),
       '-': () => dolly(1.1)

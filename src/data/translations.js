@@ -1,8 +1,5 @@
-// Sample translations for Italian and English
-// Will be loaded from /public/data/translations/it.json and /public/data/translations/en.json
-
+// Fallback dictionaries, used before translations/*.json arrives.
 export const translationsIt = {
-  // UI Elements
   "search_placeholder": "Cerca una struttura anatomica...",
   "systems": "Sistemi Anatomici",
   "info": "Informazioni",
@@ -24,13 +21,8 @@ export const translationsIt = {
   "click_to_select": "Clicca sul modello 3D per visualizzare le informazioni",
   "no_data_available": "Nessuna informazione disponibile per questa struttura",
   "structure_not_found": "Struttura non trovata",
-  "no_results": "Nessun risultato",
-  "retry": "Riprova",
-  "depth": "Profondità",
   "error_loading_model": "Errore nel caricamento del modello",
   "error_loading_data": "Errore nel caricamento dei dati",
-
-  // Systems
   "system_muscular": "Sistema muscolare",
   "system_skeletal": "Sistema scheletrico",
   "system_cardiovascular": "Sistema cardiovascolare",
@@ -40,8 +32,6 @@ export const translationsIt = {
   "system_nervous": "Sistema nervoso",
   "system_joints": "Articolazioni",
   "system_lymphatic": "Organi linfatici",
-
-  // Structure info fields
   "name": "Nome",
   "latin_name": "Nome latino",
   "system": "Sistema",
@@ -54,8 +44,6 @@ export const translationsIt = {
   "vascularization": "Vascolarizzazione",
   "clinical_notes": "Note cliniche",
   "parts": "Parti",
-
-  // Help modal
   "help_title": "Comandi",
   "help_computer": "Computer",
   "help_mobile": "Smartphone",
@@ -68,12 +56,10 @@ export const translationsIt = {
   "help_pan": "Sposta",
   "help_double_click": "Doppio clic",
   "help_approach": "Avvicina struttura",
-  "help_one_finger": "1 dito",
-  "help_pinch": "Pizzica 2 dita",
+  "help_one_finger": "Un dito",
+  "help_pinch": "Pizzica",
   "help_two_fingers": "Trascina 2 dita",
   "help_tap": "Tocco",
-
-  // Views
   "view_front": "Vista anteriore",
   "view_back": "Vista posteriore",
   "view_left": "Vista sinistra",
@@ -81,27 +67,41 @@ export const translationsIt = {
   "view_top": "Vista superiore",
   "view_bottom": "Vista inferiore",
   "view_full": "Vista completa",
-
-  // Actions
   "action_isolate": "Isola",
   "action_hide": "Nascondi",
   "action_transparent": "Rendi trasparente",
   "action_restore": "Ripristina tutto",
   "action_search": "Cerca",
-
-  // Loading states
   "loading_systems": "Caricamento sistemi...",
   "loading_structure": "Caricamento struttura...",
   "error": "Errore",
   "close": "Chiudi",
-
-  // Regions
   "region_head": "Capo",
   "region_neck": "Collo",
   "region_thorax": "Torace",
   "region_abdomen": "Addome",
   "region_upper_limb": "Arto superiore",
-  "region_lower_limb": "Arto inferiore"
+  "region_lower_limb": "Arto inferiore",
+  "no_results": "Nessun risultato",
+  "retry": "Riprova",
+  "depth": "Profondità",
+  "side_left_short": "S",
+  "side_right_short": "D",
+  "side_left": "Sinistro",
+  "side_right": "Destro",
+  "help_touch": "Touch",
+  "help_panels": "Pannelli",
+  "help_credits": "Crediti e licenze",
+  "help_frame": "Inquadra struttura",
+  "help_select": "Seleziona",
+  "help_left_drag": "Trascina sinistro",
+  "help_right_drag": "Trascina destro",
+  "help_two_finger": "Trascina 2 dita",
+  "help_left_panel": "Pannello sinistro: sistemi anatomici",
+  "help_right_panel": "Pannello destro: dettagli struttura",
+  "help_bottom_bar": "Barra inferiore: azioni sulla selezione",
+  "help_toolbar": "Barra comandi: viste predefinite",
+  "controls_title": "Comandi"
 };
 
 export const translationsEn = {
@@ -126,12 +126,8 @@ export const translationsEn = {
   "click_to_select": "Click on 3D model to view information",
   "no_data_available": "No information available for this structure",
   "structure_not_found": "Structure not found",
-  "no_results": "No results",
-  "retry": "Retry",
-  "depth": "Depth",
   "error_loading_model": "Error loading model",
   "error_loading_data": "Error loading data",
-
   "system_muscular": "Muscular system",
   "system_skeletal": "Skeletal system",
   "system_cardiovascular": "Cardiovascular system",
@@ -141,7 +137,6 @@ export const translationsEn = {
   "system_nervous": "Nervous system",
   "system_joints": "Joints",
   "system_lymphatic": "Lymphatic organs",
-
   "name": "Name",
   "latin_name": "Latin name",
   "system": "System",
@@ -154,7 +149,6 @@ export const translationsEn = {
   "vascularization": "Vascularization",
   "clinical_notes": "Clinical notes",
   "parts": "Parts",
-
   "help_title": "Controls",
   "help_computer": "Computer",
   "help_mobile": "Smartphone",
@@ -167,11 +161,10 @@ export const translationsEn = {
   "help_pan": "Pan",
   "help_double_click": "Double click",
   "help_approach": "Approach structure",
-  "help_one_finger": "1 finger",
-  "help_pinch": "Pinch 2 fingers",
+  "help_one_finger": "One finger",
+  "help_pinch": "Pinch",
   "help_two_fingers": "Drag 2 fingers",
   "help_tap": "Tap",
-
   "view_front": "Front view",
   "view_back": "Back view",
   "view_left": "Left view",
@@ -179,24 +172,39 @@ export const translationsEn = {
   "view_top": "Top view",
   "view_bottom": "Bottom view",
   "view_full": "Full view",
-
   "action_isolate": "Isolate",
   "action_hide": "Hide",
   "action_transparent": "Make transparent",
   "action_restore": "Restore all",
   "action_search": "Search",
-
   "loading_systems": "Loading systems...",
   "loading_structure": "Loading structure...",
   "error": "Error",
   "close": "Close",
-
   "region_head": "Head",
   "region_neck": "Neck",
   "region_thorax": "Thorax",
   "region_abdomen": "Abdomen",
   "region_upper_limb": "Upper limb",
-  "region_lower_limb": "Lower limb"
+  "region_lower_limb": "Lower limb",
+  "no_results": "No results",
+  "retry": "Retry",
+  "depth": "Depth",
+  "side_left_short": "L",
+  "side_right_short": "R",
+  "side_left": "Left",
+  "side_right": "Right",
+  "help_touch": "Touch",
+  "help_panels": "Panels",
+  "help_credits": "Credits and licences",
+  "help_frame": "Frame structure",
+  "help_select": "Select",
+  "help_left_drag": "Left drag",
+  "help_right_drag": "Right drag",
+  "help_two_finger": "Two-finger drag",
+  "help_left_panel": "Left panel: anatomical systems",
+  "help_right_panel": "Right panel: structure details",
+  "help_bottom_bar": "Bottom bar: actions on the selection",
+  "help_toolbar": "Toolbar: preset views",
+  "controls_title": "Controls"
 };
-
-export default { translationsIt, translationsEn };
