@@ -8,6 +8,7 @@ import { setView, resetView } from '../viewer/camera.js';
 import { loadAllData, searchStructures } from '../utils/dataLoader.js';
 import { initDepthSlider, resetDepthSlider } from './depthSlider.js';
 import { PRESETS, applyPreset } from '../data/presets.js';
+import { setInert, focusFirst, trapFocus, rovingList } from './focus.js';
 
 // Systems as they are organised in the Z-Anatomy source file. Respiratory,
 // digestive and urinary structures all live in the single "visceral" model.
@@ -91,6 +92,14 @@ export function initSystemsSidebar() {
       const preset = PRESETS.find(p => p.id === chip.dataset.preset);
       if (preset) applyPreset(preset);
     });
+  });
+
+  // Systems loaded before this ran — the startup system, or anything restored
+  // from a link — never passed through the checkbox handler, so their lists
+  // would stay empty.
+  state.loadedSystems.forEach(systemId => {
+    const content = container.querySelector(`.system-group[data-system="${systemId}"] .system-group-content`);
+    if (content && content.children.length === 0) populateSystemStructures(systemId, content);
   });
 
   // Add event listeners for system toggles
@@ -215,6 +224,9 @@ async function ensureSystemLoaded(systemId, group) {
 
 const ROWS_PER_CHUNK = 60;
 
+// Each rendered list keeps its roving-tabindex refresher, called as chunks land.
+const rovingRefreshers = new WeakMap();
+
 // One row per structure rather than per mesh: the left and right copies of the
 // same structure share a row and are picked with a side chip.
 function groupSystemStructures(systemId, lang) {
@@ -255,7 +267,7 @@ function rowMarkup(group) {
   const label = escapeHtml(group.label);
 
   return `
-    <div class="structure-item ${selected ? 'selected' : ''}" data-part="${escapeHtml(primary)}" data-parts="${escapeHtml(group.parts.join('|'))}">
+    <div class="structure-item ${selected ? 'selected' : ''}" role="option" tabindex="-1" aria-selected="${selected}" data-part="${escapeHtml(primary)}" data-parts="${escapeHtml(group.parts.join('|'))}">
       <input type="checkbox" ${visible ? 'checked' : ''} data-part-checkbox="${escapeHtml(primary)}">
       <span class="structure-name" title="${label}">${label}</span>
       <span class="structure-sides">${sides}</span>
@@ -293,6 +305,7 @@ function populateSystemStructures(systemId, container) {
 
     sentinel.insertAdjacentHTML('beforebegin', slice.map(rowMarkup).join(''));
     rendered += slice.length;
+    rovingRefreshers.get(container)?.();
 
     if (rendered >= groups.length) {
       observer.disconnect();
@@ -304,12 +317,24 @@ function populateSystemStructures(systemId, container) {
     if (entries.some(entry => entry.isIntersecting)) renderChunk();
   }, { root: container.closest('.sidebar-content'), rootMargin: '200px' });
 
+  container.setAttribute('role', 'listbox');
+  container.setAttribute('aria-label', translate('systems'));
+
   container.appendChild(sentinel);
   renderChunk();
   observer.observe(sentinel);
 
   container.addEventListener('click', onStructureListClick);
   container.addEventListener('change', onStructureListChange);
+
+  // One tab stop for the whole list; the arrows move between rows. 669 rows
+  // would otherwise be 669 stops.
+  const refreshRoving = rovingList(container, {
+    itemSelector: '.structure-item',
+    onActivate: item => selectPartById(item.dataset.part, state.viewer)
+  });
+  refreshRoving();
+  rovingRefreshers.set(container, refreshRoving);
 }
 
 function partsOf(item) {
@@ -444,17 +469,31 @@ export function initHelpModal() {
   const openBtn = document.getElementById('helpBtn');
   const closeBtn = document.getElementById('helpClose');
   const overlay = modal?.querySelector('.modal-overlay');
+  if (!modal) return;
 
-  if (openBtn) openBtn.addEventListener('click', () => modal.classList.remove('hidden'));
-  if (closeBtn) closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
-  if (overlay) overlay.addEventListener('click', () => modal.classList.add('hidden'));
+  let release = null;
 
-  // ESC to close
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
-      modal.classList.add('hidden');
-    }
-  });
+  function open() {
+    modal.classList.remove('hidden');
+    setInert(modal, false);
+    // A modal dialog keeps the focus until it is dismissed, and hands it back
+    // to whatever opened it.
+    release = trapFocus(modal.querySelector('.modal-content') || modal, { onEscape: close, returnFocusTo: openBtn });
+  }
+
+  function close() {
+    if (modal.classList.contains('hidden')) return;
+    modal.classList.add('hidden');
+    setInert(modal, true);
+    release?.();
+    release = null;
+  }
+
+  setInert(modal, true);
+
+  openBtn?.addEventListener('click', open);
+  closeBtn?.addEventListener('click', close);
+  overlay?.addEventListener('click', close);
 }
 
 // Language selector
@@ -487,7 +526,7 @@ export function initSearch() {
     if (matches.length > 0) {
       const lang = state.language || 'it';
 
-      results.innerHTML = matches.map(row => {
+      results.innerHTML = matches.map((row, index) => {
         // Paired structures are one row with a side chip each, instead of two
         // near-identical rows.
         const sides = ['left', 'right']
@@ -499,7 +538,7 @@ export function initSearch() {
         const pending = state.loadedSystems.includes(row.system) ? '' : ' is-pending';
 
         return `
-          <div class="search-result-item${pending}" data-part="${escapeHtml(target)}">
+          <div class="search-result-item${pending}" role="option" id="search-option-${index}" aria-selected="false" data-part="${escapeHtml(target)}">
             <span class="result-name">${escapeHtml(row.label)}</span>
             <span class="result-sides">${sides}</span>
             <span class="result-system">${escapeHtml(systemLabel(row.system, lang))}</span>
@@ -524,7 +563,7 @@ export function initSearch() {
         });
       });
     } else {
-      results.innerHTML = `<div class="search-result-item is-empty">${translate('no_results')}</div>`;
+      results.innerHTML = `<div class="search-result-item is-empty" role="option" aria-disabled="true">${translate('no_results')}</div>`;
       results.classList.add('show');
     }
   }, 150));
@@ -536,11 +575,76 @@ export function initSearch() {
     }
   });
 
-  // Keyboard navigation
+  // Combobox semantics: the field keeps the focus and the arrows move an
+  // "active" option, which is what a screen reader announces.
+  input.setAttribute('role', 'combobox');
+  input.setAttribute('aria-autocomplete', 'list');
+  input.setAttribute('aria-expanded', 'false');
+  input.setAttribute('aria-controls', 'searchResults');
+  results.setAttribute('role', 'listbox');
+
+  let activeIndex = -1;
+
+  function options() {
+    return [...results.querySelectorAll('.search-result-item:not(.is-empty)')];
+  }
+
+  function setActive(index) {
+    const list = options();
+    list.forEach(option => {
+      option.classList.remove('is-active');
+      option.setAttribute('aria-selected', 'false');
+    });
+
+    activeIndex = list.length ? (index + list.length) % list.length : -1;
+    const active = list[activeIndex];
+
+    if (active) {
+      active.classList.add('is-active');
+      active.setAttribute('aria-selected', 'true');
+      active.scrollIntoView({ block: 'nearest' });
+      input.setAttribute('aria-activedescendant', active.id);
+    } else {
+      input.removeAttribute('aria-activedescendant');
+    }
+  }
+
+  function closeResults() {
+    results.classList.remove('show');
+    input.setAttribute('aria-expanded', 'false');
+    input.removeAttribute('aria-activedescendant');
+    activeIndex = -1;
+  }
+
+  // The list is rebuilt on every keystroke, so the active option resets with it.
+  const observer = new MutationObserver(() => {
+    input.setAttribute('aria-expanded', String(results.classList.contains('show')));
+    activeIndex = -1;
+  });
+  observer.observe(results, { childList: true });
+
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      results.classList.remove('show');
+      closeResults();
       input.blur();
+      return;
+    }
+
+    if (!results.classList.contains('show')) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActive(activeIndex + 1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActive(activeIndex - 1);
+    } else if (e.key === 'Enter') {
+      const list = options();
+      const target = list[activeIndex] || list[0];
+      if (target) {
+        e.preventDefault();
+        target.click();
+      }
     }
   });
 }
@@ -721,14 +825,14 @@ function initDrawers() {
   const drawerQuery = window.matchMedia('(max-width: 1024px)');
 
   const panels = {
-    systems: { el: document.getElementById('systemsSidebar'), closed: '-100%', flag: 'systems-open' },
-    info: { el: document.getElementById('infoSidebar'), closed: '100%', flag: 'info-open' }
+    systems: { el: document.getElementById('systemsSidebar'), closed: '-100%', flag: 'systems-open', trigger: 'systemsOpen' },
+    info: { el: document.getElementById('infoSidebar'), closed: '100%', flag: 'info-open', trigger: 'infoOpen' }
   };
 
   // The drawer offset is written inline rather than left to a class, because
   // the off-canvas transform is declared in several places and whichever rule
   // wins is not worth reasoning about every time the stylesheet moves.
-  function apply(name, open) {
+  function apply(name, open, { moveFocus = false } = {}) {
     const panel = panels[name];
     if (!panel.el) return;
 
@@ -739,16 +843,42 @@ function initDrawers() {
     } else {
       panel.el.style.transform = '';
     }
+
+    // A panel that is off screen must not be reachable with Tab. The systems
+    // panel is a real column on desktop, so it only goes inert as a drawer.
+    const offScreen = name === 'systems' ? drawerQuery.matches && !open : !open;
+    setInert(panel.el, offScreen);
+
+    const trigger = document.getElementById(panel.trigger);
+    trigger?.setAttribute('aria-expanded', String(open));
+
+    if (!moveFocus) return;
+
+    if (open) {
+      focusFirst(panel.el);
+    } else if (trigger && trigger.offsetParent !== null) {
+      trigger.focus();
+    } else {
+      // The trigger is hidden at this width; park the focus somewhere sane.
+      document.getElementById('threeCanvas')?.focus();
+    }
   }
 
   function isOpen(name) {
     return app?.classList.contains(panels[name].flag);
   }
 
-  document.getElementById('systemsOpen')?.addEventListener('click', () => apply('systems', !isOpen('systems')));
-  document.getElementById('systemsToggle')?.addEventListener('click', () => apply('systems', false));
-  document.getElementById('infoOpen')?.addEventListener('click', () => apply('info', !isOpen('info')));
-  document.getElementById('infoToggle')?.addEventListener('click', () => apply('info', false));
+  document.getElementById('systemsOpen')?.addEventListener('click', () => apply('systems', !isOpen('systems'), { moveFocus: true }));
+  document.getElementById('systemsToggle')?.addEventListener('click', () => apply('systems', false, { moveFocus: true }));
+  document.getElementById('infoOpen')?.addEventListener('click', () => apply('info', !isOpen('info'), { moveFocus: true }));
+  document.getElementById('infoToggle')?.addEventListener('click', () => apply('info', false, { moveFocus: true }));
+
+  // Escape closes whichever panel the focus is in.
+  Object.entries(panels).forEach(([name, panel]) => {
+    panel.el?.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && isOpen(name)) apply(name, false, { moveFocus: true });
+    });
+  });
 
   // Crossing the breakpoint must not leave a drawer offset stuck on a panel
   // that is now part of the desktop layout.

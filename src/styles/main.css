@@ -1545,3 +1545,17 @@ body {
   color: var(--fg-muted);
   font-size: 12px;
 }
+
+/* Keyboard affordances -------------------------------------------------------*/
+
+.structure-item:focus-visible,
+.search-result-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* The combobox keeps DOM focus, so the active option needs its own marker. */
+.search-result-item.is-active {
+  background: var(--bg-hover);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
