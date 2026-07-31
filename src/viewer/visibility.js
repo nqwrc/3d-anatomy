@@ -23,12 +23,27 @@ function ownMaterials(mesh) {
   return materialsOf(mesh);
 }
 
-function releaseMaterial(mesh) {
-  if (!mesh.userData.ownsMaterial) return;
+// What a mesh should look like when nothing is being done to it: faded if its
+// structure is currently ghosted, otherwise the shared material from the GLB.
+// Getting this wrong is what made hovering dissolve the ghost.
+function restingMaterial(mesh, partId) {
+  const base = mesh.userData.baseMaterial;
+  if (!base) return null;
 
-  materialsOf(mesh).forEach(mat => mat.dispose());
-  mesh.material = mesh.userData.baseMaterial;
-  mesh.userData.ownsMaterial = false;
+  if (ghostedIds?.has(partId)) {
+    return Array.isArray(base) ? base.map(ghostVariantOf) : ghostVariantOf(base);
+  }
+  return base;
+}
+
+function releaseMaterial(mesh, partId) {
+  if (mesh.userData.ownsMaterial) {
+    materialsOf(mesh).forEach(mat => mat.dispose());
+    mesh.userData.ownsMaterial = false;
+  }
+
+  const resting = restingMaterial(mesh, partId);
+  if (resting) mesh.material = resting;
 }
 
 // Ghosting touches nearly every mesh at once, so it uses one shared faded
@@ -248,14 +263,8 @@ export function getSystemVisibilityState(systemId) {
 // Restoring is now "point back at the shared material" rather than copying a
 // dozen properties back one by one.
 function restoreMaterial(partId) {
-  ownMeshesOf(partId).forEach(mesh => {
-    if (mesh.userData.ownsMaterial) {
-      releaseMaterial(mesh);
-    } else if (mesh.userData.baseMaterial) {
-      // Undo a ghost swap, which does not clone.
-      mesh.material = mesh.userData.baseMaterial;
-    }
-  });
+  ghostedIds?.delete(partId);
+  ownMeshesOf(partId).forEach(mesh => releaseMaterial(mesh, partId));
 }
 
 // On a 277-piece skeleton an emissive tint on an occluded structure is simply
@@ -266,7 +275,7 @@ let ghostedIds = null;
 
 export function ghostAllExcept(partId) {
   const keep = new Set(withDescendants(partId));
-  const ghosted = [];
+  const ghosted = new Set();
 
   getMeshRegistry().forEach((node, id) => {
     if (keep.has(id)) return;
@@ -274,28 +283,29 @@ export function ghostAllExcept(partId) {
     const meshes = ownMeshesOf(id);
     if (!meshes.some(mesh => mesh.visible)) return;
 
-    meshes.forEach(mesh => {
-      const source = mesh.userData.baseMaterial;
-      if (!source) return;
+    ghosted.add(id);
+  });
 
-      mesh.material = Array.isArray(source)
-        ? source.map(ghostVariantOf)
-        : ghostVariantOf(source);
-    });
-    ghosted.push(id);
+  // Recorded first: releaseMaterial reads this to decide what "resting" means.
+  ghostedIds = ghosted;
+
+  ghosted.forEach(id => {
+    ownMeshesOf(id).forEach(mesh => releaseMaterial(mesh, id));
   });
 
   // The selected structure must read as solid even where it was see-through.
   keep.forEach(id => restoreMaterial(id));
 
-  ghostedIds = ghosted;
   notify('ghostModeChanged', partId);
 }
 
 export function clearGhost() {
   if (!ghostedIds) return;
 
-  ghostedIds.forEach(id => {
+  const wasGhosted = [...ghostedIds];
+  ghostedIds = null;
+
+  wasGhosted.forEach(id => {
     restoreMaterial(id);
 
     // Give back a transparency the user had set before the ghost.
@@ -303,7 +313,6 @@ export function clearGhost() {
     if (opacity < 1) setPartTransparency(id, opacity);
   });
 
-  ghostedIds = null;
   notify('ghostModeChanged', null);
 }
 
@@ -338,7 +347,7 @@ export function clearHighlight(partId) {
         mat.needsUpdate = true;
       });
     } else {
-      releaseMaterial(mesh);
+      releaseMaterial(mesh, partId);
     }
   });
 }

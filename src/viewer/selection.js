@@ -53,6 +53,7 @@ export function initSelection(viewer) {
 
   // Mouse events
   canvas.addEventListener('pointerdown', onPointerDown);
+  canvas.addEventListener('pointercancel', onPointerCancel);
   canvas.addEventListener('click', onClick);
   canvas.addEventListener('dblclick', onDoubleClick);
   canvas.addEventListener('pointermove', onPointerMove);
@@ -63,6 +64,7 @@ export function initSelection(viewer) {
 
   return () => {
     canvas.removeEventListener('pointerdown', onPointerDown);
+    canvas.removeEventListener('pointercancel', onPointerCancel);
     canvas.removeEventListener('click', onClick);
     canvas.removeEventListener('dblclick', onDoubleClick);
     canvas.removeEventListener('pointermove', onPointerMove);
@@ -84,7 +86,19 @@ function getEventPosition(event, canvas) {
 // so without this every attempt to change the angle selected whatever was under
 // the cursor. Touch had this discrimination from the start; the mouse did not.
 function onPointerDown(event) {
+  // Only the primary button produces a click. Recording a right-press would
+  // leave stale coordinates behind — no click ever arrives to clear them — and
+  // the next genuine click would be measured against them and dismissed as a
+  // drag.
+  if (event.button !== 0) {
+    pointerDown = null;
+    return;
+  }
   pointerDown = { x: event.clientX, y: event.clientY, type: event.pointerType };
+}
+
+function onPointerCancel() {
+  pointerDown = null;
 }
 
 function wasDrag(event, gesture) {
