@@ -201,6 +201,72 @@ body {
 .search-result-item .result-system {
   font-size: 12px;
   color: var(--fg-secondary);
+  flex-shrink: 0;
+}
+
+/* Paired structures collapse into one row; the chips pick a side. */
+.result-sides,
+.structure-sides {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.structure-side {
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 3px 5px;
+  color: var(--fg-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.structure-side:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.structure-sentinel {
+  height: 1px;
+}
+
+.result-side {
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 3px 6px;
+  color: var(--fg-secondary);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.result-side:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* The system is not loaded yet: choosing this result downloads it. */
+.search-result-item.is-pending .result-system::after {
+  content: ' ↓';
+  color: var(--accent);
+}
+
+.search-result-item.is-empty {
+  color: var(--fg-muted);
+  cursor: default;
+}
+
+.search-result-item.is-empty:hover {
+  background: transparent;
 }
 
 .header-right {
@@ -257,7 +323,14 @@ body {
   grid-template-columns: var(--sidebar-width) 1fr var(--info-width);
   grid-template-rows: 1fr var(--control-height);
   height: 100%;
+  /* Grid items default to min-height:auto, which lets a long structure list
+     stretch the row past the viewport instead of scrolling inside it. */
+  min-height: 0;
   grid-column: 1 / -1;
+}
+
+.main-layout > * {
+  min-height: 0;
 }
 
 /* Sidebar Base */
@@ -317,6 +390,9 @@ body {
 
 .sidebar-content {
   flex: 1;
+  /* Without this the panel grows to fit the list instead of scrolling, and
+     everything past the viewport becomes unreachable. */
+  min-height: 0;
   overflow-y: auto;
   padding: 8px;
 }
@@ -387,6 +463,7 @@ body {
 }
 
 .structure-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -420,15 +497,27 @@ body {
   text-overflow: ellipsis;
 }
 
+/* Floated over the row instead of sitting in the flex flow: at 280px of
+   sidebar the buttons were taking every pixel the name needed, even while
+   invisible. */
 .structure-item .structure-actions {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
   gap: 4px;
+  padding-left: 8px;
+  background: linear-gradient(to right, transparent, var(--bg-secondary) 12px);
   opacity: 0;
+  pointer-events: none;
   transition: opacity var(--transition-fast);
 }
 
-.structure-item:hover .structure-actions {
+.structure-item:hover .structure-actions,
+.structure-item:focus-within .structure-actions {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .structure-item .action-btn {
@@ -476,6 +565,97 @@ body {
   position: relative;
   background: var(--bg-primary);
   overflow: hidden;
+}
+
+/* Selection callout -------------------------------------------------------- */
+
+.callout-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  z-index: 20;
+}
+
+.callout-layer.is-visible {
+  opacity: 1;
+}
+
+.callout-layer.is-hidden {
+  opacity: 0;
+}
+
+.callout-line {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.callout-line line {
+  stroke: var(--accent);
+  stroke-width: 1;
+  opacity: 0.7;
+}
+
+.callout {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(340px, 60vw);
+  padding: 7px 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 16px var(--shadow-strong);
+  pointer-events: auto;
+  white-space: nowrap;
+}
+
+.callout-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.callout-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.callout-btn {
+  font: inherit;
+  font-size: 11px;
+  padding: 3px 7px;
+  color: var(--fg-secondary);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.callout-btn:hover {
+  background: var(--bg-hover);
+  color: var(--fg-primary);
+}
+
+.callout-close {
+  font-size: 15px;
+  line-height: 1;
+  padding: 2px 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .callout-layer { transition: none; }
 }
 
 #threeCanvas {
@@ -1030,7 +1210,10 @@ body {
     display: none;
   }
 
-  .header:has(.search-input:focus) .header-center {
+  /* Driven by a class the search button sets. The previous rule keyed off
+     :focus inside an element it had itself hidden, so the field could never be
+     reached on a phone. */
+  .header.search-open .header-center {
     display: block;
     position: absolute;
     top: calc(var(--header-height) + 8px);

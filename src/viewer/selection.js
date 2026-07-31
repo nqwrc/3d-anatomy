@@ -2,8 +2,9 @@
 import * as THREE from 'three';
 import { state, setSelectedPart, getStructureInfo } from '../state/store.js';
 import { getMeshRegistry, getPickTargets } from './loadModel.js';
-import { highlightMesh, clearHighlight } from './visibility.js';
+import { highlightMesh, clearHighlight, ghostAllExcept, clearGhost, isolatePart, hidePart } from './visibility.js';
 import { focusOnMesh } from './camera.js';
+import { showCallout, hideCallout } from '../ui/callout.js';
 
 // Distinguishes a tap from the end of an orbit gesture.
 const TAP_MAX_MOVE_PX = 10;
@@ -14,6 +15,9 @@ let mouse = new THREE.Vector2();
 let lastSelectedMesh = null;
 let lastIntersectedMesh = null;
 let touchStart = null;
+let hoverEvent = null;
+let hoverFrame = null;
+let orbiting = false;
 
 // Raycasting against the model roots tests each subtree once; the registry
 // holds nested structures, so it would test shared geometry repeatedly.
@@ -31,7 +35,12 @@ function pickAt(event, viewer) {
 }
 
 export function initSelection(viewer) {
-  const { canvas } = viewer;
+  const { canvas, controls } = viewer;
+
+  // Picking during an orbit is wasted work: the pointer is dragging, not
+  // pointing at anything.
+  controls?.addEventListener('start', () => { orbiting = true; });
+  controls?.addEventListener('end', () => { orbiting = false; });
 
   // Mouse events
   canvas.addEventListener('click', onClick);
@@ -83,11 +92,26 @@ function onDoubleClick(event) {
   }
 }
 
+// Pointer events fire far more often than frames; coalescing to one pick per
+// animation frame keeps a full-scene raycast off the critical path.
 function onPointerMove(event) {
   // Touch drives selection through the tap handler; hovering with a finger is
-  // not a gesture, and picking on every move of an orbit is wasted work.
+  // not a gesture.
   if (event.pointerType && event.pointerType !== 'mouse') return;
+  if (orbiting) return;
 
+  hoverEvent = { clientX: event.clientX, clientY: event.clientY };
+  if (hoverFrame) return;
+
+  hoverFrame = requestAnimationFrame(() => {
+    hoverFrame = null;
+    const pending = hoverEvent;
+    hoverEvent = null;
+    if (pending) processHover(pending);
+  });
+}
+
+function processHover(event) {
   const viewer = state.viewer;
   if (!viewer) return;
 
@@ -184,6 +208,17 @@ export function selectPart(partId, viewer) {
   highlightMesh(partId, 0xffdf5d, 0.8);
   lastSelectedMesh = mesh;
 
+  // Everything else drops to a ghost, so an occluded structure is still
+  // readable, and the camera eases in to answer "where is it".
+  ghostAllExcept(partId);
+  if (viewer) focusOnMesh(mesh, viewer, true, 4.5);
+
+  showCallout(partId, partData.displayName, {
+    isolate: id => isolatePart(id),
+    hide: id => { hidePart(id); deselectPart(); },
+    close: () => deselectPart()
+  });
+
   // Update part state
   getMeshRegistry().forEach((m, id) => {
     const partState = state.partStates.get(id);
@@ -207,6 +242,9 @@ export function deselectPart() {
     clearHighlight(lastSelectedMesh.userData.partId);
     lastSelectedMesh = null;
   }
+
+  clearGhost();
+  hideCallout();
 
   // Clear selection state
   getMeshRegistry().forEach((m, id) => {

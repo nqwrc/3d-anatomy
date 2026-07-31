@@ -24,6 +24,7 @@ export const translationsIt = {
   "click_to_select": "Clicca sul modello 3D per visualizzare le informazioni",
   "no_data_available": "Nessuna informazione disponibile per questa struttura",
   "structure_not_found": "Struttura non trovata",
+  "no_results": "Nessun risultato",
   "error_loading_model": "Errore nel caricamento del modello",
   "error_loading_data": "Errore nel caricamento dei dati",
 
@@ -123,6 +124,7 @@ export const translationsEn = {
   "click_to_select": "Click on 3D model to view information",
   "no_data_available": "No information available for this structure",
   "structure_not_found": "Structure not found",
+  "no_results": "No results",
   "error_loading_model": "Error loading model",
   "error_loading_data": "Error loading data",
 

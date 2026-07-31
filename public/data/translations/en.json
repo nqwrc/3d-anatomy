@@ -80,5 +80,6 @@
   "region_thorax": "Thorax",
   "region_abdomen": "Abdomen",
   "region_upper_limb": "Upper limb",
-  "region_lower_limb": "Lower limb"
+  "region_lower_limb": "Lower limb",
+  "no_results": "No results"
 }

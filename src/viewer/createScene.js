@@ -83,6 +83,15 @@ export function createScene() {
   let frameCount = 0;
   let lastFpsUpdate = 0;
 
+  // Per-frame subscribers, used by overlays that must track a 3D point on
+  // screen (the selection callout).
+  const frameCallbacks = new Set();
+
+  function onFrame(callback) {
+    frameCallbacks.add(callback);
+    return () => frameCallbacks.delete(callback);
+  }
+
   function animate(time) {
     animationId = requestAnimationFrame(animate);
 
@@ -101,6 +110,7 @@ export function createScene() {
 
     controls.update();
     renderer.render(scene, camera);
+    frameCallbacks.forEach(cb => cb());
   }
 
   function startRenderLoop() {
@@ -141,6 +151,7 @@ export function createScene() {
     startRenderLoop,
     stopRenderLoop,
     render,
+    onFrame,
     dispose,
     onResize
   };

@@ -7,52 +7,54 @@ import { selectPartById, deselectPart } from '../viewer/selection.js';
 import { setView, resetView } from '../viewer/camera.js';
 import { loadAllData, searchStructures } from '../utils/dataLoader.js';
 
+// Systems as they are organised in the Z-Anatomy source file. Respiratory,
+// digestive and urinary structures all live in the single "visceral" model.
+const SYSTEM_LABELS = {
+  it: {
+    skeletal: 'Sistema scheletrico',
+    muscular: 'Sistema muscolare',
+    joints: 'Articolazioni',
+    cardiovascular: 'Sistema cardiovascolare',
+    lymphatic: 'Organi linfatici',
+    nervous: 'Sistema nervoso e organi di senso',
+    visceral: 'Sistemi viscerali'
+  },
+  en: {
+    skeletal: 'Skeletal system',
+    muscular: 'Muscular system',
+    joints: 'Joints',
+    cardiovascular: 'Cardiovascular system',
+    lymphatic: 'Lymphoid organs',
+    nervous: 'Nervous system & sense organs',
+    visceral: 'Visceral systems'
+  }
+};
+
+const SYSTEM_ICONS = {
+  skeletal: '🦴',
+  muscular: '💪',
+  joints: '🦵',
+  cardiovascular: '❤️',
+  lymphatic: '🫧',
+  nervous: '🧠',
+  visceral: '🫁'
+};
+
+export function systemLabel(systemId, lang = state.language || 'it') {
+  return SYSTEM_LABELS[lang]?.[systemId] || SYSTEM_LABELS.it[systemId] || systemId;
+}
+
 export function initSystemsSidebar() {
   const container = document.getElementById('systemsList');
   if (!container) return;
 
-  // Systems as they are organised in the Z-Anatomy source file. Respiratory,
-  // digestive and urinary structures all live in the single "visceral" model.
-  const systemOrder = SYSTEM_IDS;
-
-  const systemLabels = {
-    it: {
-      skeletal: 'Sistema scheletrico',
-      muscular: 'Sistema muscolare',
-      joints: 'Articolazioni',
-      cardiovascular: 'Sistema cardiovascolare',
-      lymphatic: 'Organi linfatici',
-      nervous: 'Sistema nervoso e organi di senso',
-      visceral: 'Sistemi viscerali'
-    },
-    en: {
-      skeletal: 'Skeletal system',
-      muscular: 'Muscular system',
-      joints: 'Joints',
-      cardiovascular: 'Cardiovascular system',
-      lymphatic: 'Lymphoid organs',
-      nervous: 'Nervous system & sense organs',
-      visceral: 'Visceral systems'
-    }
-  };
-
-  const systemIcons = {
-    skeletal: '🦴',
-    muscular: '💪',
-    joints: '🦵',
-    cardiovascular: '❤️',
-    lymphatic: '🫧',
-    nervous: '🧠',
-    visceral: '🫁'
-  };
-
   const lang = state.language || 'it';
 
-  container.innerHTML = systemOrder.map(systemId => {
+  container.innerHTML = SYSTEM_IDS.map(systemId => {
     const parts = getSystemParts(systemId);
     const count = parts.length;
-    const icon = systemIcons[systemId] || '🔬';
-    const label = systemLabels[lang]?.[systemId] || systemId;
+    const icon = SYSTEM_ICONS[systemId] || '🔬';
+    const label = systemLabel(systemId, lang);
 
     // Determine initial visibility state
     const visibility = getSystemVisibilityState(systemId);
@@ -99,6 +101,32 @@ export function initSystemsSidebar() {
   });
 }
 
+// Selecting a structure from search must work even when its system has never
+// been downloaded: 2552 of the 2829 structures are in that state on a fresh
+// page, and every one of them used to be a dead click.
+export async function selectStructureAnywhere(partId) {
+  const info = getStructureInfo(partId);
+  const systemId = info?.system;
+
+  if (systemId && !state.loadedSystems.includes(systemId)) {
+    const group = document.querySelector(`.system-group[data-system="${systemId}"]`);
+    await ensureSystemLoaded(systemId, group);
+
+    if (group) {
+      const checkbox = group.querySelector('[data-system-checkbox]');
+      const content = group.querySelector('.system-group-content');
+      if (checkbox) checkbox.checked = true;
+      if (content) {
+        content.style.display = 'block';
+        if (content.children.length === 0) populateSystemStructures(systemId, content);
+      }
+    }
+    showSystem(systemId);
+  }
+
+  selectPartById(partId, state.viewer);
+}
+
 const pendingSystemLoads = new Map();
 
 async function ensureSystemLoaded(systemId, group) {
@@ -123,82 +151,156 @@ async function ensureSystemLoaded(systemId, group) {
   await pendingSystemLoads.get(systemId);
 }
 
-function populateSystemStructures(systemId, container) {
-  const parts = getSystemParts(systemId);
-  const lang = state.language || 'it';
+const ROWS_PER_CHUNK = 60;
 
-  container.innerHTML = parts.map(partId => {
+// One row per structure rather than per mesh: the left and right copies of the
+// same structure share a row and are picked with a side chip.
+function groupSystemStructures(systemId, lang) {
+  const groups = new Map();
+
+  getSystemParts(systemId).forEach(partId => {
     const info = getStructureInfo(partId) || {};
+    const base = info.baseName || partId;
 
-    const name = info.name?.[lang] || info.name?.en || partId;
-    const partState = state.partStates.get(partId);
-    const visible = partState?.visible !== false;
-    const selected = partState?.selected === true;
+    let group = groups.get(base);
+    if (!group) {
+      group = {
+        base,
+        label: (info.name?.[lang] || info.name?.en || base).replace(/\s*\((sinistro|destro|left|right)\)$/i, ''),
+        parts: [],
+        sides: {}
+      };
+      groups.set(base, group);
+    }
 
-    return `
-      <div class="structure-item ${selected ? 'selected' : ''}" data-part="${partId}">
-        <input type="checkbox" ${visible ? 'checked' : ''} data-part-checkbox="${partId}">
-        <span class="structure-name">${escapeHtml(name)}</span>
-        <div class="structure-actions">
-          <button class="action-btn isolate" data-action="isolate" data-part="${partId}" title="Isola" aria-label="Isola">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><circle cx="12" cy="12" r="3"/></svg>
-          </button>
-          <button class="action-btn hide" data-action="hide" data-part="${partId}" title="Nascondi" aria-label="Nascondi">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19M2 2l20 20"/></svg>
-          </button>
-          <button class="action-btn transparent" data-action="transparent" data-part="${partId}" title="Trasparenza" aria-label="Trasparenza">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2v20M2 12h20"/></svg>
-          </button>
-        </div>
+    group.parts.push(partId);
+    group.sides[info.side || 'none'] = partId;
+  });
+
+  return [...groups.values()];
+}
+
+function rowMarkup(group) {
+  const primary = group.sides.none || group.sides.right || group.sides.left;
+  const visible = group.parts.some(id => state.partStates.get(id)?.visible !== false);
+  const selected = group.parts.some(id => state.partStates.get(id)?.selected === true);
+
+  const sides = ['left', 'right']
+    .filter(side => group.sides[side])
+    .map(side => `<button type="button" class="structure-side" data-select="${escapeHtml(group.sides[side])}" title="${side === 'left' ? 'Sinistro' : 'Destro'}">${side === 'left' ? 'S' : 'D'}</button>`)
+    .join('');
+
+  const label = escapeHtml(group.label);
+
+  return `
+    <div class="structure-item ${selected ? 'selected' : ''}" data-part="${escapeHtml(primary)}" data-parts="${escapeHtml(group.parts.join('|'))}">
+      <input type="checkbox" ${visible ? 'checked' : ''} data-part-checkbox="${escapeHtml(primary)}">
+      <span class="structure-name" title="${label}">${label}</span>
+      <span class="structure-sides">${sides}</span>
+      <div class="structure-actions">
+        <button class="action-btn isolate" data-action="isolate" title="Isola" aria-label="Isola">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+        <button class="action-btn hide" data-action="hide" title="Nascondi" aria-label="Nascondi">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19M2 2l20 20"/></svg>
+        </button>
+        <button class="action-btn transparent" data-action="transparent" title="Trasparenza" aria-label="Trasparenza">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2v20M2 12h20"/></svg>
+        </button>
       </div>
-    `;
-  }).join('');
+    </div>
+  `;
+}
 
-  // Add event listeners for structure items
-  container.querySelectorAll('[data-part-checkbox]').forEach(checkbox => {
-    checkbox.addEventListener('change', (e) => {
-      const partId = e.target.dataset.partCheckbox;
-      if (e.target.checked) {
-        showPart(partId);
-      } else {
-        hidePart(partId);
-      }
-    });
-  });
+function populateSystemStructures(systemId, container) {
+  const lang = state.language || 'it';
+  const groups = groupSystemStructures(systemId, lang);
 
-  container.querySelectorAll('.structure-item').forEach(item => {
-    item.addEventListener('click', (e) => {
-      if (e.target.closest('button') || e.target.type === 'checkbox') return;
-      const partId = item.dataset.part;
-      selectPartById(partId, state.viewer);
-    });
-  });
+  // A 669-structure system used to build ~10 000 nodes and ~2700 listeners in
+  // one go. Rows arrive in chunks as the panel is scrolled, behind a single
+  // delegated listener.
+  let rendered = 0;
+  container.innerHTML = '';
 
-  container.querySelectorAll('[data-action="isolate"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const partId = e.currentTarget.dataset.part;
-      isolatePart(partId);
-    });
-  });
+  const sentinel = document.createElement('div');
+  sentinel.className = 'structure-sentinel';
 
-  container.querySelectorAll('[data-action="hide"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const partId = e.currentTarget.dataset.part;
-      hidePart(partId);
-      deselectPart();
-    });
-  });
+  const renderChunk = () => {
+    const slice = groups.slice(rendered, rendered + ROWS_PER_CHUNK);
+    if (!slice.length) return;
 
-  container.querySelectorAll('[data-action="transparent"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const partId = e.currentTarget.dataset.part;
-      const visibility = getPartVisibility(partId);
-      setPartTransparency(partId, visibility.opacity < 1 ? 1 : 0.3);
-    });
+    sentinel.insertAdjacentHTML('beforebegin', slice.map(rowMarkup).join(''));
+    rendered += slice.length;
+
+    if (rendered >= groups.length) {
+      observer.disconnect();
+      sentinel.remove();
+    }
+  };
+
+  const observer = new IntersectionObserver(entries => {
+    if (entries.some(entry => entry.isIntersecting)) renderChunk();
+  }, { root: container.closest('.sidebar-content'), rootMargin: '200px' });
+
+  container.appendChild(sentinel);
+  renderChunk();
+  observer.observe(sentinel);
+
+  container.addEventListener('click', onStructureListClick);
+  container.addEventListener('change', onStructureListChange);
+}
+
+function partsOf(item) {
+  return (item.dataset.parts || item.dataset.part || '').split('|').filter(Boolean);
+}
+
+function onStructureListChange(event) {
+  const checkbox = event.target.closest('[data-part-checkbox]');
+  if (!checkbox) return;
+
+  const item = checkbox.closest('.structure-item');
+  partsOf(item).forEach(partId => {
+    if (checkbox.checked) showPart(partId); else hidePart(partId);
   });
+}
+
+function onStructureListClick(event) {
+  const item = event.target.closest('.structure-item');
+  if (!item) return;
+
+  const side = event.target.closest('[data-select]');
+  if (side) {
+    event.stopPropagation();
+    selectPartById(side.dataset.select, state.viewer);
+    return;
+  }
+
+  const action = event.target.closest('[data-action]')?.dataset.action;
+  const parts = partsOf(item);
+  const primary = item.dataset.part;
+
+  if (action === 'isolate') {
+    event.stopPropagation();
+    isolatePart(primary);
+    return;
+  }
+
+  if (action === 'hide') {
+    event.stopPropagation();
+    parts.forEach(hidePart);
+    deselectPart();
+    return;
+  }
+
+  if (action === 'transparent') {
+    event.stopPropagation();
+    const opacity = getPartVisibility(primary).opacity < 1 ? 1 : 0.3;
+    parts.forEach(partId => setPartTransparency(partId, opacity));
+    return;
+  }
+
+  if (event.target.type === 'checkbox') return;
+  selectPartById(primary, state.viewer);
 }
 
 function getPartVisibility(partId) {
@@ -320,28 +422,46 @@ export function initSearch() {
 
     const matches = searchStructures(query);
     if (matches.length > 0) {
-      results.innerHTML = matches.map(match => `
-        <div class="search-result-item" data-part="${match.partId}">
-          <span class="result-icon">🔍</span>
-          <span class="result-name">${escapeHtml(match.name)}</span>
-          <span class="result-system">${escapeHtml(match.system)}</span>
-        </div>
-      `).join('');
+      const lang = state.language || 'it';
+
+      results.innerHTML = matches.map(row => {
+        // Paired structures are one row with a side chip each, instead of two
+        // near-identical rows.
+        const sides = ['left', 'right']
+          .filter(side => row.sides[side])
+          .map(side => `<button type="button" class="result-side" data-part="${escapeHtml(row.sides[side])}">${side === 'left' ? 'S' : 'D'}</button>`)
+          .join('');
+
+        const target = row.sides.none || row.sides.right || row.sides.left;
+        const pending = state.loadedSystems.includes(row.system) ? '' : ' is-pending';
+
+        return `
+          <div class="search-result-item${pending}" data-part="${escapeHtml(target)}">
+            <span class="result-name">${escapeHtml(row.label)}</span>
+            <span class="result-sides">${sides}</span>
+            <span class="result-system">${escapeHtml(systemLabel(row.system, lang))}</span>
+          </div>
+        `;
+      }).join('');
 
       results.classList.add('show');
 
+      const choose = async (partId) => {
+        input.value = '';
+        results.innerHTML = '';
+        results.classList.remove('show');
+        input.blur();
+        await selectStructureAnywhere(partId);
+      };
+
       results.querySelectorAll('.search-result-item').forEach(item => {
-        item.addEventListener('click', () => {
-          const partId = item.dataset.part;
-          selectPartById(partId, state.viewer);
-          input.value = '';
-          results.innerHTML = '';
-          results.classList.remove('show');
-          input.blur();
+        item.addEventListener('click', (clickEvent) => {
+          const side = clickEvent.target.closest('.result-side');
+          choose(side ? side.dataset.part : item.dataset.part);
         });
       });
     } else {
-      results.innerHTML = '<div class="search-result-item">Nessun risultato</div>';
+      results.innerHTML = `<div class="search-result-item is-empty">${translate('no_results')}</div>`;
       results.classList.add('show');
     }
   }, 150));
@@ -491,6 +611,29 @@ export async function initUI(viewer) {
   initLanguageSelector();
   initSearch();
   initDrawers();
+  initMobileSearch();
+}
+
+// Under 1024px the search field is hidden; this button is the only way to it.
+function initMobileSearch() {
+  const button = document.getElementById('searchOpen');
+  const header = document.querySelector('.header');
+  const input = document.getElementById('searchInput');
+  if (!button || !header || !input) return;
+
+  button.addEventListener('click', () => {
+    const open = header.classList.toggle('search-open');
+    button.setAttribute('aria-expanded', String(open));
+    if (open) input.focus();
+  });
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      header.classList.remove('search-open');
+      button.setAttribute('aria-expanded', 'false');
+      input.blur();
+    }
+  });
 }
 
 // On narrow layouts both sidebars slide off-canvas; these wire the header

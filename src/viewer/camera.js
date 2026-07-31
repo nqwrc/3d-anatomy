@@ -91,14 +91,19 @@ function animateCamera(camera, controls, targetPosition, targetTarget) {
   });
 }
 
-export function focusOnMesh(mesh, viewer, animate = true) {
+// `spread` sets how much room is left around the structure. Selecting uses a
+// gentler value than double-click, which is an explicit "take me there".
+export function focusOnMesh(mesh, viewer, animate = true, spread = 2.5) {
   const { camera, controls } = viewer;
 
   const box = new THREE.Box3().setFromObject(mesh);
   const center = box.getCenter(new THREE.Vector3());
   const size = box.getSize(new THREE.Vector3());
   const maxDim = Math.max(size.x, size.y, size.z);
-  const distance = maxDim * 2.5;
+
+  // A small bone would otherwise pull the camera inside neighbouring geometry.
+  const currentDistance = camera.position.distanceTo(controls.target);
+  const distance = Math.min(Math.max(maxDim * spread, maxDim * 1.2), currentDistance);
 
   // Calculate direction from current camera to target
   const direction = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();

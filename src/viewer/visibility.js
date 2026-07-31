@@ -225,6 +225,56 @@ function restoreMaterial(partId) {
   });
 }
 
+// On a 277-piece skeleton an emissive tint on an occluded structure is simply
+// not visible, so selecting also drops everything else back to a ghost. The
+// user's own transparency settings are restored from partStates when it clears.
+const GHOST_OPACITY = 0.12;
+let ghostedIds = null;
+
+export function ghostAllExcept(partId) {
+  const keep = new Set(withDescendants(partId));
+  const ghosted = [];
+
+  getMeshRegistry().forEach((node, id) => {
+    if (keep.has(id)) return;
+
+    const meshes = ownMeshesOf(id);
+    if (!meshes.some(mesh => mesh.visible)) return;
+
+    meshes.forEach(mesh => {
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      materials.forEach(mat => {
+        mat.transparent = true;
+        mat.opacity = GHOST_OPACITY;
+        mat.depthWrite = false;
+        mat.needsUpdate = true;
+      });
+    });
+    ghosted.push(id);
+  });
+
+  // The selected structure must read as solid even where it was see-through.
+  keep.forEach(id => restoreMaterial(id));
+
+  ghostedIds = ghosted;
+  notify('ghostModeChanged', partId);
+}
+
+export function clearGhost() {
+  if (!ghostedIds) return;
+
+  ghostedIds.forEach(id => {
+    restoreMaterial(id);
+
+    // Give back a transparency the user had set before the ghost.
+    const opacity = getPartState(id)?.opacity ?? 1;
+    if (opacity < 1) setPartTransparency(id, opacity);
+  });
+
+  ghostedIds = null;
+  notify('ghostModeChanged', null);
+}
+
 // Highlighting only touches `emissive`, so it can be undone without disturbing
 // a transparency the user set.
 export function highlightMesh(partId, color = 0xffdf5d, intensity = 0.5) {

@@ -18,7 +18,9 @@ export async function loadAllData() {
       setTranslations({ it, en });
     }
 
-    // Build search index
+    // Italian names for the structures people actually search for; the index is
+    // built after them so they are searchable from the first keystroke.
+    await loadSynonyms();
     buildSearchIndex();
 
     notify('dataLoaded', true);
@@ -28,46 +30,136 @@ export async function loadAllData() {
   }
 }
 
+// "femore" must find "Femur", so queries and terms are compared with accents
+// folded away and case removed.
+export function normalise(text) {
+  return text
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+let synonyms = {};
+let synonymsByFirstWord = new Map();
+
+export async function loadSynonyms() {
+  try {
+    const response = await fetch(asset('data/synonyms.it.json'));
+    if (response.ok) synonyms = await response.json();
+  } catch {
+    // Search still works without them, just not in Italian.
+    synonyms = {};
+  }
+
+  // Z-Anatomy names a muscle "Gluteus maximus muscle" and splits others into
+  // parts ("Acromial part of deltoid muscle"), so an Italian term is attached
+  // to every structure whose name contains it, not only to an exact match.
+  // Bucketing by first word keeps that from being 1644 x 204 comparisons.
+  synonymsByFirstWord = new Map();
+  Object.keys(synonyms).forEach(key => {
+    const first = key.split(' ')[0];
+    if (!synonymsByFirstWord.has(first)) synonymsByFirstWord.set(first, []);
+    synonymsByFirstWord.get(first).push(key);
+  });
+}
+
+function italianTermsFor(normalisedBase) {
+  const words = normalisedBase.split(/[^a-z0-9+]+/).filter(Boolean);
+  const found = [];
+
+  for (const word of new Set(words)) {
+    const candidates = synonymsByFirstWord.get(word);
+    if (!candidates) continue;
+
+    for (const key of candidates) {
+      if (normalisedBase === key || normalisedBase.includes(key)) {
+        found.push(...synonyms[key]);
+      }
+    }
+  }
+
+  return [...new Set(found)];
+}
+
+// One row per anatomical structure, not per mesh: a paired structure appears
+// once with both sides attached, instead of filling the list with duplicates.
 function buildSearchIndex() {
   if (!state.partsData) return;
 
-  const index = [];
+  const rows = new Map();
 
   Object.entries(state.partsData).forEach(([partId, info]) => {
-    const terms = [partId.toLowerCase()];
+    const base = info.baseName || partId;
+    const system = info.system || 'unknown';
+    const key = `${base}|${system}`;
 
-    if (info.name?.it) terms.push(info.name.it.toLowerCase());
-    if (info.name?.en) terms.push(info.name.en.toLowerCase());
-    if (info.latinName) terms.push(info.latinName.toLowerCase());
-    if (info.searchTerms) terms.push(...info.searchTerms.map(t => t.toLowerCase()));
+    let row = rows.get(key);
+    if (!row) {
+      const italian = italianTermsFor(normalise(base));
+      row = {
+        key,
+        base,
+        label: base.replace(/^\((.*)\)$/, '$1'),
+        system,
+        sides: {},
+        partIds: [],
+        italian,
+        terms: [normalise(base), ...italian.map(normalise)]
+      };
+      rows.set(key, row);
+    }
 
-    index.push({
-      partId,
-      name: info.name?.it || info.name?.en || partId,
-      system: info.system || 'unknown',
-      terms: [...new Set(terms)]
-    });
+    row.partIds.push(partId);
+    row.sides[info.side || 'none'] = partId;
   });
 
-  setSearchIndex(index);
+  setSearchIndex([...rows.values()]);
 }
 
-export function searchStructures(query) {
-  if (!state.searchIndex || query.length < 2) return [];
+function scoreRow(row, query, tokens) {
+  let best = 0;
 
-  const lowerQuery = query.toLowerCase();
-  const results = [];
-
-  for (const item of state.searchIndex) {
-    for (const term of item.terms) {
-      if (term.includes(lowerQuery)) {
-        results.push(item);
-        break;
-      }
-      if (results.length >= 10) break;
-    }
-    if (results.length >= 10) break;
+  for (const term of row.terms) {
+    if (term === query) best = Math.max(best, 100);
+    else if (term.startsWith(query)) best = Math.max(best, 80);
+    else if (term.split(/[\s(),.-]+/).some(word => word.startsWith(query))) best = Math.max(best, 60);
+    else if (term.includes(query)) best = Math.max(best, 40);
   }
 
-  return results;
+  if (!best && tokens.length > 1) {
+    // Every token has to appear somewhere for a multi-word query to count.
+    const all = row.terms.join(' ');
+    if (tokens.every(token => all.includes(token))) best = 35;
+  }
+
+  if (!best) return 0;
+
+  // Prefer what the user can already see over a system still to be downloaded.
+  if (state.loadedSystems.includes(row.system)) best += 15;
+
+  // A short name that matches is a better answer than a long one that merely
+  // contains the query.
+  best -= Math.min(row.label.length / 12, 6);
+
+  return best;
+}
+
+export function searchStructures(query, limit = 30) {
+  if (!state.searchIndex || !query) return [];
+
+  const normalised = normalise(query);
+  if (normalised.length < 2) return [];
+
+  const tokens = normalised.split(/\s+/).filter(Boolean);
+  const scored = [];
+
+  for (const row of state.searchIndex) {
+    const score = scoreRow(row, normalised, tokens);
+    if (score > 0) scored.push({ row, score });
+  }
+
+  scored.sort((a, b) => b.score - a.score || a.row.label.length - b.row.label.length);
+
+  return scored.slice(0, limit).map(entry => entry.row);
 }
