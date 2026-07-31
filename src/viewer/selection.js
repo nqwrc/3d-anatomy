@@ -1,10 +1,11 @@
 // Selection - Raycasting, highlighting, and selection management
 import * as THREE from 'three';
-import { state, setSelectedPart, getStructureInfo } from '../state/store.js';
-import { getMeshRegistry, getPickTargets } from './loadModel.js';
+import { state, setSelectedPart, getStructureInfo, translate } from '../state/store.js';
+import { getMeshRegistry, getPickTargets, getStructure } from './loadModel.js';
 import { highlightMesh, clearHighlight, ghostAllExcept, clearGhost, isolatePart, hidePart } from './visibility.js';
 import { focusOnMesh } from './camera.js';
 import { showCallout, hideCallout } from '../ui/callout.js';
+import { loadDefinitions } from '../data/anatomy.js';
 
 // Distinguishes a tap from the end of an orbit gesture.
 const TAP_MAX_MOVE_PX = 10;
@@ -269,80 +270,98 @@ function showInfoPanel(partData) {
   if (placeholder) placeholder.style.display = 'none';
   if (structureInfo) structureInfo.classList.remove('hidden');
 
-  const lang = state.language || 'it';
+  const lang = state.language || 'en';
   const info = partData.info || {};
 
   const name = info.name?.[lang] || info.name?.en || partData.displayName;
-  const latinName = info.latinName || '';
-  const system = info.system || partData.system;
-  const systemLabel = getSystemLabel(system, lang);
-  const description = info.description?.[lang] || info.description?.en || '';
-  const functions = info.functions || [];
-  const origin = info.origin || '';
-  const insertion = info.insertion || '';
-  const innervation = info.innervation || '';
-  const vascularization = info.vascularization || '';
-  const clinicalNotes = info.clinicalNotes || '';
+  const systemLabel = getSystemLabel(info.system || partData.system, lang);
+
+  const sideKey = info.side === 'left' ? 'side_left' : info.side === 'right' ? 'side_right' : null;
 
   structureInfo.innerHTML = `
     <div class="structure-header">
-      <div class="structure-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-        </svg>
-      </div>
       <div class="structure-title">
         <h3>${escapeHtml(name)}</h3>
-        ${latinName ? `<span class="structure-latin">${escapeHtml(latinName)}</span>` : ''}
-        <span class="structure-system">${escapeHtml(systemLabel)}</span>
+        ${info.latinName ? `<span class="structure-latin">${escapeHtml(info.latinName)}</span>` : ''}
+        <div class="structure-tags">
+          <span class="structure-system">${escapeHtml(systemLabel)}</span>
+          ${sideKey ? `<span class="structure-tag">${escapeHtml(translate(sideKey, lang))}</span>` : ''}
+          ${info.official === false ? `<span class="structure-tag warn" title="${escapeHtml(translate('non_official_hint', lang))}">${escapeHtml(translate('non_official', lang))}</span>` : ''}
+        </div>
       </div>
     </div>
+    ${relationMarkup(partData.id, lang)}
+    <div class="structure-description" data-definition>${escapeHtml(translate('loading_definition', lang))}</div>
+  `;
 
-    ${description ? `<div class="structure-description">${escapeHtml(description)}</div>` : ''}
+  structureInfo.querySelectorAll('[data-relation]').forEach(link => {
+    link.addEventListener('click', () => selectPartById(link.dataset.relation, state.viewer));
+  });
 
-    <div class="structure-details">
-      ${functions.length > 0 ? `
-        <div class="detail-group">
-          <h4>${translate('functions', lang)}</h4>
-          <ul>${functions.map(f => `<li>${escapeHtml(f)}</li>`).join('')}</ul>
-        </div>
-      ` : ''}
+  fillDefinition(partData, lang);
+}
 
-      ${origin ? `
-        <div class="detail-group">
-          <h4>${translate('origin', lang)}</h4>
-          <p>${escapeHtml(origin)}</p>
-        </div>
-      ` : ''}
+// Z-Anatomy's collections are flat, so there is no tree to show — but the glTF
+// graph does record which structure contains which, and that relation is worth
+// surfacing: 868 of the 2827 structures sit inside another one.
+function relationMarkup(partId, lang) {
+  const entry = getStructure(partId);
+  if (!entry) return '';
 
-      ${insertion ? `
-        <div class="detail-group">
-          <h4>${translate('insertion', lang)}</h4>
-          <p>${escapeHtml(insertion)}</p>
-        </div>
-      ` : ''}
+  const label = id => {
+    const info = getStructureInfo(id);
+    return escapeHtml(info?.name?.[lang] || info?.name?.en || id);
+  };
 
-      ${innervation ? `
-        <div class="detail-group">
-          <h4>${translate('innervation', lang)}</h4>
-          <p>${escapeHtml(innervation)}</p>
-        </div>
-      ` : ''}
+  const parts = [];
 
-      ${vascularization ? `
-        <div class="detail-group">
-          <h4>${translate('vascularization', lang)}</h4>
-          <p>${escapeHtml(vascularization)}</p>
-        </div>
-      ` : ''}
+  if (entry.parentId) {
+    parts.push(`
+      <div class="relation">
+        <span class="relation-label">${escapeHtml(translate('part_of', lang))}</span>
+        <button type="button" class="relation-link" data-relation="${escapeHtml(entry.parentId)}">${label(entry.parentId)}</button>
+      </div>
+    `);
+  }
 
-      ${clinicalNotes ? `
-        <div class="detail-group">
-          <h4>${translate('clinical_notes', lang)}</h4>
-          <p>${escapeHtml(clinicalNotes)}</p>
-        </div>
-      ` : ''}
-    </div>
+  if (entry.childIds.length) {
+    parts.push(`
+      <div class="relation">
+        <span class="relation-label">${escapeHtml(translate('contains', lang))}</span>
+        <span class="relation-links">
+          ${entry.childIds.slice(0, 8).map(id => `<button type="button" class="relation-link" data-relation="${escapeHtml(id)}">${label(id)}</button>`).join('')}
+          ${entry.childIds.length > 8 ? `<span class="relation-more">+${entry.childIds.length - 8}</span>` : ''}
+        </span>
+      </div>
+    `);
+  }
+
+  return parts.length ? `<div class="structure-relations">${parts.join('')}</div>` : '';
+}
+
+// Definitions arrive from a separate file that is still downloading on a cold
+// start, so the panel renders first and fills in when the text is available.
+async function fillDefinition(partData, lang) {
+  const definitions = await loadDefinitions();
+  const target = document.querySelector('#structureInfo [data-definition]');
+
+  // The user may have selected something else in the meantime.
+  if (!target || state.selectedPart?.id !== partData.id) return;
+
+  const base = partData.info?.baseName || partData.id;
+  const text = definitions[base];
+
+  if (!text) {
+    target.classList.add('is-empty');
+    target.textContent = translate('no_definition', lang);
+    return;
+  }
+
+  target.classList.remove('is-empty');
+  target.innerHTML = `
+    ${escapeHtml(text)}
+    <a class="definition-source" href="https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(base)}"
+       target="_blank" rel="noopener">${escapeHtml(translate('read_more', lang))}</a>
   `;
 }
 
@@ -364,55 +383,13 @@ function hideFooterActions() {
   if (footer) footer.style.display = 'none';
 }
 
+// System labels come from the shared dictionary; there used to be a private
+// copy here that drifted from the one in the sidebar.
 function getSystemLabel(system, lang) {
-  const labels = {
-    it: {
-      muscular: 'Sistema muscolare',
-      skeletal: 'Sistema scheletrico',
-      cardiovascular: 'Sistema cardiovascolare',
-      respiratory: 'Sistema respiratorio',
-      digestive: 'Sistema digerente',
-      urinary: 'Sistema urinario',
-      nervous: 'Sistema nervoso',
-      joints: 'Articolazioni',
-      lymphatic: 'Organi linfatici'
-    },
-    en: {
-      muscular: 'Muscular system',
-      skeletal: 'Skeletal system',
-      cardiovascular: 'Cardiovascular system',
-      respiratory: 'Respiratory system',
-      digestive: 'Digestive system',
-      urinary: 'Urinary system',
-      nervous: 'Nervous system',
-      joints: 'Joints',
-      lymphatic: 'Lymphatic organs'
-    }
-  };
-  return labels[lang]?.[system] || system;
+  const label = translate(`system_${system}`, lang);
+  return label === `system_${system}` ? system : label;
 }
 
-function translate(key, lang) {
-  const dict = {
-    it: {
-      functions: 'Funzioni',
-      origin: 'Origine',
-      insertion: 'Inserzione',
-      innervation: 'Innervazione',
-      vascularization: 'Vascolarizzazione',
-      clinical_notes: 'Note cliniche'
-    },
-    en: {
-      functions: 'Functions',
-      origin: 'Origin',
-      insertion: 'Insertion',
-      innervation: 'Innervation',
-      vascularization: 'Vascularization',
-      clinical_notes: 'Clinical notes'
-    }
-  };
-  return dict[lang]?.[key] || key;
-}
 
 function escapeHtml(text) {
   const div = document.createElement('div');

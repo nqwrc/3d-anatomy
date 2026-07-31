@@ -260,13 +260,13 @@ function rowMarkup(group) {
       <span class="structure-name" title="${label}">${label}</span>
       <span class="structure-sides">${sides}</span>
       <div class="structure-actions">
-        <button class="action-btn isolate" data-action="isolate" title="Isola" aria-label="Isola">
+        <button class="action-btn isolate" data-action="isolate" title="${escapeHtml(translate('isolate'))}" aria-label="${escapeHtml(translate('isolate'))}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><circle cx="12" cy="12" r="3"/></svg>
         </button>
-        <button class="action-btn hide" data-action="hide" title="Nascondi" aria-label="Nascondi">
+        <button class="action-btn hide" data-action="hide" title="${escapeHtml(translate('hide'))}" aria-label="${escapeHtml(translate('hide'))}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19M2 2l20 20"/></svg>
         </button>
-        <button class="action-btn transparent" data-action="transparent" title="Trasparenza" aria-label="Trasparenza">
+        <button class="action-btn transparent" data-action="transparent" title="${escapeHtml(translate('transparent'))}" aria-label="${escapeHtml(translate('transparent'))}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2v20M2 12h20"/></svg>
         </button>
       </div>
@@ -619,7 +619,7 @@ function updateFooterButtons(part) {
 
   const visibility = getPartVisibility(part.id);
   if (transparentBtn) {
-    transparentBtn.textContent = visibility.opacity < 1 ? 'Opaco' : 'Trasparenza';
+    transparentBtn.textContent = translate(visibility.opacity < 1 ? 'opaque' : 'transparent');
   }
 }
 

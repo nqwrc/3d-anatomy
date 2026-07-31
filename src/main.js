@@ -1,3 +1,4 @@
+import '@fontsource-variable/inter';
 import './styles/main.css';
 import { createScene } from './viewer/createScene.js';
 import { loadSystems } from './viewer/loadModel.js';
@@ -8,7 +9,7 @@ import { readState, storedState, applyState, scheduleStateWrite } from './state/
 import { loadModel } from './viewer/loadModel.js';
 import { selectPartById } from './viewer/selection.js';
 import { showPart, hidePart, setPartTransparency, isolatePart } from './viewer/visibility.js';
-import { loadSystemsData, buildPartsData, DEFAULT_SYSTEM } from './data/anatomy.js';
+import { loadSystemsData, loadLexicon, loadDefinitions, buildPartsData, DEFAULT_SYSTEM } from './data/anatomy.js';
 import { translationsIt, translationsEn } from './data/translations.js';
 
 setTranslations({ it: translationsIt, en: translationsEn });
@@ -44,10 +45,13 @@ async function init() {
   const loadingOverlay = document.getElementById('loadingOverlay');
 
   try {
-    const systemsData = await loadSystemsData();
+    const [systemsData, lexicon] = await Promise.all([loadSystemsData(), loadLexicon()]);
     setSystemsData(systemsData);
 
-    const partsData = buildPartsData(systemsData);
+    // Definitions are big; start them now and let them land whenever.
+    loadDefinitions();
+
+    const partsData = buildPartsData(systemsData, lexicon);
     setPartsData(partsData);
     setSearchIndex(buildSearchIndex(partsData));
     console.log(`[main] Anatomy data ready: ${Object.keys(partsData).length} structures`);

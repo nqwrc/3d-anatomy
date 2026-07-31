@@ -56,14 +56,40 @@ export async function loadSystemsData() {
   return response.json();
 }
 
+// Latin names and the non-official-terminology flag, extracted from the
+// Z-Anatomy source file by tools/export-lexicon.py.
+export async function loadLexicon() {
+  try {
+    const response = await fetch(asset('data/lexicon.json'));
+    return response.ok ? await response.json() : {};
+  } catch {
+    return {};
+  }
+}
+
+// Definitions are an order of magnitude larger than the rest of the data, so
+// they are fetched once in the background rather than blocking the first frame.
+let definitionsPromise = null;
+
+export function loadDefinitions() {
+  if (!definitionsPromise) {
+    definitionsPromise = fetch(asset('data/definitions.json'))
+      .then(response => (response.ok ? response.json() : {}))
+      .catch(() => ({}));
+  }
+  return definitionsPromise;
+}
+
 // Builds the part dictionary the store expects, keyed by mesh name because that
 // is what loadModel.js registers as partId.
-export function buildPartsData(systemsData) {
+export function buildPartsData(systemsData, lexicon = {}) {
   const parts = {};
 
   Object.entries(systemsData).forEach(([systemId, meshNames]) => {
     meshNames.forEach(meshName => {
       const { base, side } = splitSide(meshName);
+      const entry = lexicon[base] || {};
+
       parts[meshName] = {
         id: meshName,
         meshName,
@@ -73,7 +99,10 @@ export function buildPartsData(systemsData) {
         },
         baseName: base,
         side,
-        system: systemId
+        system: systemId,
+        latinName: entry.la || '',
+        // Z-Anatomy parenthesises names that are not in Terminologia Anatomica.
+        official: entry.official !== false
       };
     });
   });

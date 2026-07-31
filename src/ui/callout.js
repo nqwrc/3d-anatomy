@@ -101,7 +101,10 @@ export function showCallout(partId, displayName, actions = {}) {
   handlers = actions;
   currentPartId = partId;
 
-  root.querySelector('.callout-name').textContent = displayName;
+  const info = state.partsData?.[partId];
+  const nameEl = root.querySelector('.callout-name');
+  nameEl.textContent = displayName;
+  nameEl.title = info?.latinName ? `${displayName} — ${info.latinName}` : displayName;
   root.querySelector('[data-callout="isolate"]').textContent = translate('isolate');
   root.querySelector('[data-callout="hide"]').textContent = translate('hide');
 

@@ -29,7 +29,7 @@ export const translationsIt = {
   "system_respiratory": "Sistema respiratorio",
   "system_digestive": "Sistema digerente",
   "system_urinary": "Sistema urinario",
-  "system_nervous": "Sistema nervoso",
+  "system_nervous": "Sistema nervoso e organi di senso",
   "system_joints": "Articolazioni",
   "system_lymphatic": "Organi linfatici",
   "name": "Nome",
@@ -101,7 +101,16 @@ export const translationsIt = {
   "help_right_panel": "Pannello destro: dettagli struttura",
   "help_bottom_bar": "Barra inferiore: azioni sulla selezione",
   "help_toolbar": "Barra comandi: viste predefinite",
-  "controls_title": "Comandi"
+  "controls_title": "Comandi",
+  "loading_definition": "Caricamento definizione...",
+  "no_definition": "Nessuna definizione disponibile per questa struttura.",
+  "read_more": "Approfondisci su Wikipedia",
+  "non_official": "non ufficiale",
+  "non_official_hint": "Termine non incluso nella Terminologia Anatomica",
+  "system_visceral": "Sistemi viscerali",
+  "part_of": "Parte di",
+  "contains": "Contiene",
+  "opaque": "Opaco"
 };
 
 export const translationsEn = {
@@ -134,9 +143,9 @@ export const translationsEn = {
   "system_respiratory": "Respiratory system",
   "system_digestive": "Digestive system",
   "system_urinary": "Urinary system",
-  "system_nervous": "Nervous system",
+  "system_nervous": "Nervous system & sense organs",
   "system_joints": "Joints",
-  "system_lymphatic": "Lymphatic organs",
+  "system_lymphatic": "Lymphoid organs",
   "name": "Name",
   "latin_name": "Latin name",
   "system": "System",
@@ -206,5 +215,14 @@ export const translationsEn = {
   "help_right_panel": "Right panel: structure details",
   "help_bottom_bar": "Bottom bar: actions on the selection",
   "help_toolbar": "Toolbar: preset views",
-  "controls_title": "Controls"
+  "controls_title": "Controls",
+  "loading_definition": "Loading definition...",
+  "no_definition": "No definition available for this structure.",
+  "read_more": "Read more on Wikipedia",
+  "non_official": "non-official",
+  "non_official_hint": "Term not in Terminologia Anatomica",
+  "system_visceral": "Visceral systems",
+  "part_of": "Part of",
+  "contains": "Contains",
+  "opaque": "Opaque"
 };

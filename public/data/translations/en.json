@@ -28,9 +28,9 @@
   "system_respiratory": "Respiratory system",
   "system_digestive": "Digestive system",
   "system_urinary": "Urinary system",
-  "system_nervous": "Nervous system",
+  "system_nervous": "Nervous system & sense organs",
   "system_joints": "Joints",
-  "system_lymphatic": "Lymphatic organs",
+  "system_lymphatic": "Lymphoid organs",
   "name": "Name",
   "latin_name": "Latin name",
   "system": "System",
@@ -100,5 +100,14 @@
   "help_right_panel": "Right panel: structure details",
   "help_bottom_bar": "Bottom bar: actions on the selection",
   "help_toolbar": "Toolbar: preset views",
-  "controls_title": "Controls"
+  "controls_title": "Controls",
+  "loading_definition": "Loading definition...",
+  "no_definition": "No definition available for this structure.",
+  "read_more": "Read more on Wikipedia",
+  "non_official": "non-official",
+  "non_official_hint": "Term not in Terminologia Anatomica",
+  "system_visceral": "Visceral systems",
+  "part_of": "Part of",
+  "contains": "Contains",
+  "opaque": "Opaque"
 }

@@ -28,7 +28,7 @@
   "system_respiratory": "Sistema respiratorio",
   "system_digestive": "Sistema digerente",
   "system_urinary": "Sistema urinario",
-  "system_nervous": "Sistema nervoso",
+  "system_nervous": "Sistema nervoso e organi di senso",
   "system_joints": "Articolazioni",
   "system_lymphatic": "Organi linfatici",
   "name": "Nome",
@@ -100,5 +100,14 @@
   "help_right_panel": "Pannello destro: dettagli struttura",
   "help_bottom_bar": "Barra inferiore: azioni sulla selezione",
   "help_toolbar": "Barra comandi: viste predefinite",
-  "controls_title": "Comandi"
+  "controls_title": "Comandi",
+  "loading_definition": "Caricamento definizione...",
+  "no_definition": "Nessuna definizione disponibile per questa struttura.",
+  "read_more": "Approfondisci su Wikipedia",
+  "non_official": "non ufficiale",
+  "non_official_hint": "Termine non incluso nella Terminologia Anatomica",
+  "system_visceral": "Sistemi viscerali",
+  "part_of": "Parte di",
+  "contains": "Contiene",
+  "opaque": "Opaco"
 }
