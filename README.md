@@ -1,3 +1,5 @@
+> **Featured project.** A browser-based 3D atlas that makes more than 2,800 anatomical structures explorable without installing specialist software.
+
 # 3D Anatomy
 
 An interactive 3D atlas of human anatomy: 2827 structures across seven systems,
