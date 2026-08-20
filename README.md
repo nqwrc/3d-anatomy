@@ -45,9 +45,9 @@ hiding a parent used to hide unrelated children. `loadModel.js` detaches nested
 structures to the model root (preserving the world transform) and records the
 containment relation separately, which is what the details panel shows.
 
-**Materials are shared.** The GLB ships roughly 142 materials for thousands of
-meshes. The loader keeps that sharing and clones a material only when a single
-mesh is modified, restoring the shared reference afterwards.
+**Materials are shared.** The seven GLBs ship 65 materials (47 unique names)
+for thousands of meshes. The loader keeps that sharing and clones a material
+only when a single mesh is modified, restoring the shared reference afterwards.
 
 ### Regenerating the models
 
@@ -81,8 +81,10 @@ characters, with a link to the full article in the UI).
 
 ## What may live in public/
 
-Only what should be served verbatim: the models, the JSON data, the Draco
-decoder, the favicon. Anything Vite should process — the stylesheet, the fonts —
+Only what should be served verbatim: the models, the upstream license notice
+they ship with (`public/models/License.txt`, required by LICENSE/NOTICE), the
+JSON data, the Draco decoder, the favicon. Anything Vite should process — the
+stylesheet, the fonts —
 belongs in `src/`, so it gets a content hash and cannot be served stale from a
 browser cache. `public/` once held 900 MB of Blender sources and every build
 copied them into `dist/`.

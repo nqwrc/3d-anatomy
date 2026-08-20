@@ -136,7 +136,7 @@ export function initSystemsSidebar() {
 }
 
 // Selecting a structure from search must work even when its system has never
-// been downloaded: 2552 of the 2829 structures are in that state on a fresh
+// been downloaded: 2550 of the 2827 structures are in that state on a fresh
 // page, and every one of them used to be a dead click.
 export async function selectStructureAnywhere(partId) {
   const info = getStructureInfo(partId);

@@ -45,7 +45,7 @@ export function getPickTargets() {
 }
 
 // The meshes a structure owns directly, i.e. excluding those belonging to a
-// nested structure. 868 of the 2829 structures are descendants of another one,
+// nested structure. 868 of the 2827 structures are descendants of another one,
 // so "every mesh under this node" is not the same thing as "this structure".
 export function ownMeshesOf(partId) {
   const entry = structures.get(partId);
@@ -224,7 +224,7 @@ function setupMesh(mesh, systemId, viewer) {
   // Idempotent: a mesh must not be set up twice.
   if (mesh.userData.baseMaterial) return;
 
-  // The GLB ships ~142 materials shared across thousands of meshes. Cloning one
+  // The GLB ships 65 materials shared across thousands of meshes. Cloning one
   // per mesh used to produce 3499 distinct materials, which defeats three.js
   // render-state sorting. Keep the shared reference and clone only when a mesh
   // is actually modified — see viewer/visibility.js.

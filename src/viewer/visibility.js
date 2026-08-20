@@ -4,7 +4,7 @@ import { state, setHiddenParts, setTransparentParts, setIsolatedPart, getPartSta
 import { getMeshRegistry, getMeshesBySystem, ownMeshesOf, withDescendants } from './loadModel.js';
 
 // --- Material ownership ------------------------------------------------------
-// Meshes share the ~142 materials that came out of the GLB. A mesh only gets
+// Meshes share the 65 materials that came out of the GLB. A mesh only gets
 // its own copy when it is actually modified, and goes back to the shared one
 // when the modification is undone.
 
@@ -47,7 +47,7 @@ function releaseMaterial(mesh, partId) {
 }
 
 // Ghosting touches nearly every mesh at once, so it uses one shared faded
-// variant per source material — 142 of them, not one per mesh.
+// variant per source material — 65 of them, not one per mesh.
 const ghostVariants = new WeakMap();
 
 function ghostVariantOf(material) {
@@ -63,7 +63,7 @@ function ghostVariantOf(material) {
 }
 
 // Visibility is applied to the meshes a structure owns, never to its node:
-// three.js propagates `visible` down the subtree, and 868 of the 2829
+// three.js propagates `visible` down the subtree, and 868 of the 2827
 // structures sit inside another one, so touching the node would take unrelated
 // structures with it.
 function setStructureVisible(partId, visible) {
