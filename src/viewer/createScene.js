@@ -17,6 +17,18 @@ export function createScene() {
     throw new Error('Canvas element #threeCanvas not found');
   }
 
+  // The canvas is laid out by CSS, at 100% of #viewerContainer. Measure the
+  // container, never the canvas: renderer.setSize() must not be allowed to
+  // write the element's style, or the viewer ends up observing a size it set
+  // itself and can never recover from a first layout that measured zero.
+  const container = canvas.parentElement || canvas;
+
+  function viewportSize() {
+    return { width: container.clientWidth, height: container.clientHeight };
+  }
+
+  const initialSize = viewportSize();
+
   const renderer = new THREE.WebGLRenderer({
     canvas,
     antialias: true,
@@ -25,7 +37,8 @@ export function createScene() {
   });
   console.log('[createScene] Renderer created');
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+  // updateStyle = false: only the drawing buffer, the stylesheet owns the box.
+  renderer.setSize(Math.max(initialSize.width, 1), Math.max(initialSize.height, 1), false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
@@ -36,7 +49,7 @@ export function createScene() {
   // (metres) tall, so near/far and the camera distance are in the same order.
   const camera = new THREE.PerspectiveCamera(
     50, // FOV
-    canvas.clientWidth / canvas.clientHeight,
+    Math.max(initialSize.width, 1) / Math.max(initialSize.height, 1), // aspect
     0.01, // near
     100 // far
   );
@@ -67,8 +80,7 @@ export function createScene() {
 
   // Handle resize
   function onResize() {
-    const width = canvas.clientWidth;
-    const height = canvas.clientHeight;
+    const { width, height } = viewportSize();
     if (!width || !height) return;
 
     camera.aspect = width / height;
@@ -117,10 +129,12 @@ export function createScene() {
     camera.position.copy(controls.target).add(offset.setLength(distance));
   }
 
-  // Watches the canvas itself, so opening or closing a panel resizes the view
-  // even though the window did not change.
+  // Watches the container, so opening or closing a panel resizes the view even
+  // though the window did not change, and so a viewer built before its first
+  // real layout — a page loaded in a background tab, a box still collapsed —
+  // fills in as soon as the box has a size.
   const resizeObserver = new ResizeObserver(onResize);
-  resizeObserver.observe(canvas);
+  resizeObserver.observe(container);
   window.addEventListener('resize', onResize);
 
   // Animation loop. Frames are drawn on demand: continuously redrawing up to
