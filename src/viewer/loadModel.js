@@ -69,7 +69,31 @@ export function getLoadedSystems() {
   return state.loadedSystems;
 }
 
-export async function loadModel(systemId, viewer, options = {}) {
+const inFlight = new Map();
+
+// One model per system, however many callers ask for it. Two of them can ask
+// at once — a shared link restoring its state while the opening batch is still
+// in flight — and a second scene.add() would leave an unreachable copy of the
+// whole system behind: rendered, counted twice in loadedSystems, and written
+// twice into the link the next time it is serialised.
+export function loadModel(systemId, viewer, options = {}) {
+  if (state.loadedSystems.includes(systemId)) {
+    return Promise.resolve({
+      systemId,
+      model: modelRoots.get(systemId),
+      meshCount: systemRegistry.get(systemId)?.length || 0
+    });
+  }
+
+  const running = inFlight.get(systemId);
+  if (running) return running;
+
+  const promise = loadModelOnce(systemId, viewer, options).finally(() => inFlight.delete(systemId));
+  inFlight.set(systemId, promise);
+  return promise;
+}
+
+async function loadModelOnce(systemId, viewer, options = {}) {
   const { scene, renderer, camera } = viewer;
 
   console.log(`[loadModel] Starting load of ${systemId}.glb`);
@@ -237,32 +261,30 @@ export async function loadSystems(systemIds, viewer, options = {}) {
       }
     }
   } else {
-    // Parallel loading with concurrency limit
+    // Parallel loading with a concurrency limit: one worker per slot, each
+    // taking the next system off the queue until it runs dry. The queue used
+    // to be driven from two places at once — the .finally of every load and a
+    // Promise.race chain whose result was discarded — which oversubscribed the
+    // limit and, from six systems up, returned while the last ones were still
+    // loading. Whoever awaited it then restored a shared link against a scene
+    // that was not finished.
     const concurrency = 2;
     const queue = [...systemIds];
-    const running = [];
 
-    const runNext = () => {
-      if (queue.length === 0) return Promise.resolve();
-
-      const systemId = queue.shift();
-      const promise = loadModel(systemId, viewer).finally(() => {
-        running.splice(running.indexOf(promise), 1);
-        runNext();
-      });
-
-      running.push(promise);
-
-      if (running.length >= concurrency) {
-        return Promise.race(running).then(runNext);
+    const worker = async () => {
+      while (queue.length) {
+        const systemId = queue.shift();
+        try {
+          await loadModel(systemId, viewer);
+        } catch (error) {
+          // A model that will not load costs its own system and nothing else,
+          // exactly as in the sequential branch above.
+          console.error(`Failed to load ${systemId}:`, error);
+        }
       }
-
-      runNext();
-      return Promise.all(running);
     };
 
-    await runNext();
-    await Promise.all(running);
+    await Promise.all(Array.from({ length: Math.min(concurrency, queue.length) }, worker));
   }
 
   // Center camera on all loaded models

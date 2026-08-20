@@ -97,8 +97,15 @@ export async function applyState(saved, { loadSystem, selectPart, setVisible, se
     if (saved.language) setLanguage(saved.language);
 
     for (const systemId of saved.systems) {
-      if (!state.loadedSystems.includes(systemId)) {
+      if (state.loadedSystems.includes(systemId)) continue;
+
+      try {
         await loadSystem(systemId);
+      } catch (error) {
+        // A system that refuses to load costs its own structures and nothing
+        // else: the camera, the isolation and the selection are still restored
+        // on top of whatever did load.
+        console.error(`[urlState] Failed to load ${systemId}:`, error);
       }
     }
 
