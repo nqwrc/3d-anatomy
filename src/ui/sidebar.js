@@ -142,20 +142,36 @@ export async function selectStructureAnywhere(partId) {
   const info = getStructureInfo(partId);
   const systemId = info?.system;
 
-  if (systemId && !state.loadedSystems.includes(systemId)) {
-    const group = document.querySelector(`.system-group[data-system="${systemId}"]`);
-    await ensureSystemLoaded(systemId, group);
+  if (systemId) {
+    // Switching a system off leaves it in loadedSystems with an unload timer
+    // running, so "already loaded" is not the same as "on screen". Without
+    // this the structure would be selected inside a system nobody can see, and
+    // the timer would then dispose the geometry under the live selection.
+    cancelUnload(systemId);
 
-    if (group) {
-      const checkbox = group.querySelector('[data-system-checkbox]');
-      const content = group.querySelector('.system-group-content');
+    const groupEl = () => document.querySelector(`.system-group[data-system="${systemId}"]`);
+    const loaded = state.loadedSystems.includes(systemId);
+    // Ask the scene rather than the checkbox: the checkbox is a rendering of
+    // this answer and can be older than it. A system with anything still on
+    // screen is left alone, because showSystem() would undo every structure
+    // the user hid or faded inside it.
+    const hidden = loaded && !getSystemVisibilityState(systemId).visible;
+
+    if (!loaded || hidden) {
+      if (!loaded) await ensureSystemLoaded(systemId, groupEl());
+
+      // Re-read the row after the await: it may have been rebuilt while the
+      // model was in flight.
+      const group = groupEl();
+      const checkbox = group?.querySelector('[data-system-checkbox]');
+      const content = group?.querySelector('.system-group-content');
       if (checkbox) checkbox.checked = true;
       if (content) {
         content.style.display = 'block';
         if (content.children.length === 0) populateSystemStructures(systemId, content);
       }
+      showSystem(systemId);
     }
-    showSystem(systemId);
   }
 
   selectPartById(partId, state.viewer);
@@ -729,6 +745,10 @@ function updateFooterButtons(part) {
 
 function updateUIText(lang) {
   const t = (key) => translate(key, lang);
+
+  // Assistive technology takes pronunciation and language from the document,
+  // not from the picker in the header.
+  document.documentElement.lang = lang;
 
   // Update placeholders
   const searchInput = document.getElementById('searchInput');

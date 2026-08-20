@@ -181,6 +181,11 @@ function processHover(event) {
     lastIntersectedMesh = null;
     viewer.canvas.style.cursor = 'grab';
   }
+
+  // Hovering only mutates materials, and frames are drawn on demand: over an
+  // idle scene the tint would sit in the material until something else asked
+  // for a frame. Everything above changed what the next one looks like.
+  viewer.render();
 }
 
 function onTouchStart(event) {

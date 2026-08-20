@@ -643,16 +643,24 @@ body {
   inset: 0;
   pointer-events: none;
   opacity: 0;
-  transition: opacity var(--transition-fast);
+  /* Fading out on opacity alone leaves the label hit-testable and its buttons
+     in the tab order: an invisible box over the model that swallows the drag
+     you meant for the camera and answers clicks on empty space. visibility
+     goes with the fade — it stays visible for its whole duration and flips at
+     the end — and takes the hit-testing and the focus with it. */
+  visibility: hidden;
+  transition: opacity var(--transition-fast), visibility var(--transition-fast);
   z-index: 20;
 }
 
 .callout-layer.is-visible {
   opacity: 1;
+  visibility: visible;
 }
 
 .callout-layer.is-hidden {
   opacity: 0;
+  visibility: hidden;
 }
 
 .callout-line {
