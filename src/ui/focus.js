@@ -106,6 +106,10 @@ export function rovingList(container, { itemSelector, onActivate }) {
       case 'End': event.preventDefault(); focusItem(list, list.length - 1); break;
       case 'Enter':
       case ' ':
+        // Only when the row itself has the focus. A checkbox or an action
+        // button inside it handles its own activation, and taking the key
+        // here left every one of them inert from the keyboard.
+        if (event.target !== current) break;
         event.preventDefault();
         onActivate?.(current);
         break;

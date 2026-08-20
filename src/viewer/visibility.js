@@ -106,11 +106,10 @@ export function showPart(partId) {
   notify('partShown', partId);
 }
 
-export function setPartTransparency(partId, opacity) {
-  if (!getMeshRegistry().has(partId)) return;
-
-  opacity = THREE.MathUtils.clamp(opacity, 0, 1);
-
+// One structure's fade, without the notification. Both entry points go through
+// here, so both clone before they write and both leave the same recorded state
+// behind.
+function applyTransparency(partId, opacity) {
   ownMeshesOf(partId).forEach(mesh => {
     if (opacity >= 1 && !mesh.userData.ownsMaterial) return;
 
@@ -131,6 +130,13 @@ export function setPartTransparency(partId, opacity) {
   } else {
     state.transparentParts.delete(partId);
   }
+}
+
+export function setPartTransparency(partId, opacity) {
+  if (!getMeshRegistry().has(partId)) return;
+
+  opacity = THREE.MathUtils.clamp(opacity, 0, 1);
+  applyTransparency(partId, opacity);
 
   notify('partTransparencyChanged', { partId, opacity });
 }
@@ -142,7 +148,20 @@ export function isolatePart(partId) {
 
   batchPartStates(() => {
     getMeshRegistry().forEach((node, id) => {
-      setStructureVisible(id, keep.has(id));
+      const keeping = keep.has(id);
+      setStructureVisible(id, keeping);
+      if (!keeping) return;
+
+      // Isolating is a "show" like every other one. Isolating a row while
+      // something else is selected used to leave the isolated structure
+      // wearing the ghost material: the one thing left on screen, at 12%
+      // opacity with no depth write, over an empty viewport.
+      restoreMaterial(id);
+
+      // restoreMaterial hands the mesh back to the shared material, so a fade
+      // the user asked for has to be re-applied rather than quietly dropped.
+      const opacity = getPartState(id)?.opacity ?? 1;
+      if (opacity < 1) applyTransparency(id, opacity);
     });
   });
 
@@ -205,27 +224,12 @@ export function setSystemTransparency(systemId, opacity) {
   batchPartStates(() => {
     getMeshesBySystem(systemId).forEach(node => {
       const partId = node.userData.partId;
-      if (!partId) return;
-
-      ownMeshesOf(partId).forEach(mesh => {
-        const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-        materials.forEach(mat => {
-          mat.transparent = opacity < 1;
-          mat.opacity = opacity;
-          mat.depthWrite = opacity >= 1;
-          mat.needsUpdate = true;
-        });
-      });
-
-      const partState = getPartState(partId);
-      partState.opacity = opacity;
-      setPartState(partId, { opacity });
-
-      if (opacity < 1) {
-        state.transparentParts.add(partId);
-      } else {
-        state.transparentParts.delete(partId);
-      }
+      // Clone-on-write, exactly as for a single structure: this used to write
+      // straight into the materials that came out of the GLB, which thousands
+      // of meshes share, so one sweep of the depth slider faded structures
+      // nobody asked about and nothing could put them back — releaseMaterial
+      // hands the mesh to the same object the fade had already spoiled.
+      if (partId) applyTransparency(partId, opacity);
     });
   });
 

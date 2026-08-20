@@ -397,8 +397,15 @@ body {
   display: none !important;
 }
 
-.sidebar-toggle {
+/* The systems panel is a column on wide layouts, not a drawer: its close
+   button had nothing to close and only threw the focus at the canvas. It comes
+   back with the drawers below 1024px. The information panel slides over the
+   viewer at every width, so its own close button stays. */
+#systemsToggle {
   display: none;
+}
+
+.sidebar-toggle {
   width: 32px;
   height: 32px;
   display: flex;
