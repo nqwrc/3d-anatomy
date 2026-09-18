@@ -1,8 +1,8 @@
 # status
 
-state: active
+state: archived
 remote: github-public
-updated: 2026-08-13
+updated: 2026-09-18
 stale-after-days: 30
 
 ## kpi
@@ -16,3 +16,8 @@ project overview.
 
 ## backlog
 - nothing tracked here; see the repo's open issues
+
+## log
+- 2026-09-18 — archived: 36 days idle, backlog empty, live and public with
+  nothing further planned - evidence: this file's own `## now`/`## backlog`.
+  The site stays live; only the harness kit's state changed.
