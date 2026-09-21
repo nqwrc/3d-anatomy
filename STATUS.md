@@ -2,7 +2,7 @@
 
 state: archived
 remote: github-public
-updated: 2026-09-18
+updated: 2026-09-21
 stale-after-days: 30
 
 ## kpi
